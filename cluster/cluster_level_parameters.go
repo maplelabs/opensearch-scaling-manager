@@ -5,8 +5,9 @@
 //	Node metrics: This data structure will provide node level metrics.
 //
 // The cluster metrics contains list of the node metrics collected over all the nodes present in a cluster.
-// Also package contains a data structure called Metric which will calculate the statistics over a period of time.
-// This will be used by recommendation module.
+// The package contains a struct called MetricStatsCluster which will calculate the statistics over a period of time.
+// The package contains a struct called MetricViolatedCountCluster which will calculate the violated count over a period of time.
+// The structs be used by recommendation module.
 package cluster
 
 // This struct will contain node metrics for a node in the OpenSearch cluster.
@@ -36,23 +37,23 @@ type Node struct {
 // This struct will contain the static metrics of the cluster.
 type ClusterStatic struct {
 	// ClusterName indicates the Cluster name for the OpenSearch cluster.
-	ClusterName string
+	ClusterName string `yaml:"cluster_name"`
 	// IpAddress indicate the master node IP for the OpenSearch cluster.
-	IpAddress string
+	IpAddress string `yaml:"ip_address"`
 	// CloudType indicate the type of the cloud service where the OpenSearch cluster is deployed.
-	CloudType string
+	CloudType string `yaml:"cloud_type"`
 	// BaseNodeType indicate the instance type of the node.
 	// This parameters depends on the cloud service.
-	BaseNodeType string
+	BaseNodeType string `yaml:"base_node_type"`
 	// NumCpusPerNode indicates the number of the CPU core running on a node in a cluster.
-	NumCpusPerNode string
+	NumCpusPerNode int `yaml:"number_cpus_per_node"`
 	// RAMPerNodeInGB indicates the RAM size in GB running on a node in a cluster.
-	RAMPerNodeInGB string
+	RAMPerNodeInGB int `yaml:"ram_per_node_in_gb"`
 	// DiskPerNodeInGB indicates the Disk size in GB running on a node in a cluster.
-	DiskPerNodeInGB string
+	DiskPerNodeInGB int `yaml:"disk_per_node_in_gb"`
 	// NumMaxNodesAllowed indicates the number of maximum allowed node present in the cluster.
 	// Based on this value we will determine whether to scale out further or not.
-	NumMaxNodesAllowed int
+	NumMaxNodesAllowed int `yaml:"number_max_nodes_allowed"`
 }
 
 // This struct will contain the dynamic metrics of the cluster.
@@ -93,7 +94,9 @@ type Cluster struct {
 }
 
 // This struct used by the recommendation engine to find the statistics of a metrics for a given period.(CPU, MEM, HEAP, DISK).
-type Metric struct {
+type MetricStats struct {
+	// MetricName indicate the metric for which the statistics is calculate for a given period
+	MetricName string
 	// Avg indicates the average for a metric for a time period.
 	Avg float32
 	// Min indicates the minimum value for a metric for a time period.
@@ -102,18 +105,42 @@ type Metric struct {
 	Max float32
 }
 
+// This struct contains statistics for a node for an evaluation period.
+type MetricStatsNode struct {
+	// MetricStatsList indicates a list of statistics for different metrices for a node.
+	MetricStatsList []MetricStats
+	// HostIp indicates the IP Address for a host
+	HostIp string
+}
+
 // This struct contains statistics for cluster and node for an evaluation period.
-type MetricValues struct {
-	// ClusterLevel indicates the statistical data for a metric for a time period.
-	ClusterLevel Metric
-	// NodeLevel indicates the list of statistical data for a metric for a node for a time period.
-	NodeLevel []Metric
+type MetricStatsCluster struct {
+	// ClusterLevel indicates a list statistics for different metrices for the cluster for a time period.
+	ClusterLevel []MetricStats
+	// NodeLevel indicates a list of list of statistics for different metrices for all the nodes.
+	NodeLevel []MetricStatsNode
+}
+
+// This struct will provide count, number of times a rule is voilated for a metric
+type MetricViolatedCount struct {
+	// MetricName indicate the metric for which the count is calculated for a given period
+	MetricName string
+	// Count indicates number of times the limit is reached calulated for a given period
+	ViolatedCount int
+}
+
+// This struct will provide count, number of times a rule is voilated for a metric in a node
+type MetricViolatedCountNode struct {
+	// MetricViolatedCountList indicates a list of statistics for different metrices for a node.
+	MetricViolatedCountList []MetricViolatedCount
+	// HostIp indicates the IP Address for a host
+	HostIp string
 }
 
 // This contains the count voilated for cluster and node for an evaluation period.
-type MetricCount struct {
+type MetricViolatedCountCluster struct {
 	// ClusterLevel indicates the count voilated for a cluster for a time period.
-	ClusterLevel int
+	ClusterLevel []MetricViolatedCount
 	// NodeLevel indicates the list of the count voilated for a node for a time period.
-	NodeLevel []int
+	NodeLevel []MetricViolatedCountNode
 }
