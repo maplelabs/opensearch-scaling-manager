@@ -1,4 +1,4 @@
-// This packkage provide the data structure needed to get the metrics.
+// This package provide the data structure needed to get the metrics.
 // There are two kind of metrics:
 //
 //	Cluster metrics: This data structure will provide cluster level metrics.
@@ -95,8 +95,6 @@ type Cluster struct {
 
 // This struct used by the recommendation engine to find the statistics of a metrics for a given period.(CPU, MEM, HEAP, DISK).
 type MetricStats struct {
-	// MetricName indicate the metric for which the statistics is calculate for a given period
-	MetricName string
 	// Avg indicates the average for a metric for a time period.
 	Avg float32
 	// Min indicates the minimum value for a metric for a time period.
@@ -105,42 +103,54 @@ type MetricStats struct {
 	Max float32
 }
 
-// This struct contains statistics for a node for an evaluation period.
+// This struct contains statistics for a metric on a node for an evaluation period.
 type MetricStatsNode struct {
-	// MetricStatsList indicates a list of statistics for different metrices for a node.
-	MetricStatsList []MetricStats
+	// MetricStats indicates statistics for a metric on a node.
+	MetricStats
 	// HostIp indicates the IP Address for a host
 	HostIp string
 }
 
 // This struct contains statistics for cluster and node for an evaluation period.
 type MetricStatsCluster struct {
+	// MetricName indicate the metric for which the statistics is calculate for a given period
+	MetricName string
 	// ClusterLevel indicates a list statistics for different metrices for the cluster for a time period.
-	ClusterLevel []MetricStats
+	ClusterLevel MetricStats
 	// NodeLevel indicates a list of list of statistics for different metrices for all the nodes.
 	NodeLevel []MetricStatsNode
 }
 
 // This struct will provide count, number of times a rule is voilated for a metric
 type MetricViolatedCount struct {
-	// MetricName indicate the metric for which the count is calculated for a given period
-	MetricName string
 	// Count indicates number of times the limit is reached calulated for a given period
 	ViolatedCount int
 }
 
 // This struct will provide count, number of times a rule is voilated for a metric in a node
 type MetricViolatedCountNode struct {
-	// MetricViolatedCountList indicates a list of statistics for different metrices for a node.
-	MetricViolatedCountList []MetricViolatedCount
+	// MetricViolatedCount indicates the violated count for a metric on a node.
+	MetricViolatedCount
 	// HostIp indicates the IP Address for a host
 	HostIp string
 }
 
 // This contains the count voilated for cluster and node for an evaluation period.
 type MetricViolatedCountCluster struct {
-	// ClusterLevel indicates the count voilated for a cluster for a time period.
-	ClusterLevel []MetricViolatedCount
-	// NodeLevel indicates the list of the count voilated for a node for a time period.
+	// MetricName indicate the metric for which the count is calculated for a given period
+	MetricName string
+	// ClusterLevel indicates the count voilated for a metric on a cluster for a time period.
+	ClusterLevel MetricViolatedCount
+	// NodeLevel indicates the list of the count voilated for a metric on a node for a time period.
 	NodeLevel []MetricViolatedCountNode
+}
+
+func GetClusterAvg(metricName string, decisionPeriod int) MetricStatsCluster {
+	var metricStatsCluster MetricStatsCluster
+	return metricStatsCluster
+}
+
+func GetClusterCount(metricName string, decisonPeriod int, limit float32) MetricViolatedCountCluster {
+	var metricViolatedCount MetricViolatedCountCluster
+	return metricViolatedCount
 }
