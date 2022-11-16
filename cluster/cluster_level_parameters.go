@@ -113,11 +113,11 @@ type MetricStatsNode struct {
 
 // This struct contains statistics for cluster and node for an evaluation period.
 type MetricStatsCluster struct {
-	// MetricName indicate the metric for which the statistics is calculate for a given period
+	// MetricName indicate the metric for which the statistics is calculated for a given period
 	MetricName string
-	// ClusterLevel indicates a list statistics for different metrices for the cluster for a time period.
+	// ClusterLevel indicates statistics for a metric on a cluster for a time period.
 	ClusterLevel MetricStats
-	// NodeLevel indicates a list of list of statistics for different metrices for all the nodes.
+	// NodeLevel indicates statistics for a metrics on all the nodes.
 	NodeLevel []MetricStatsNode
 }
 
@@ -141,14 +141,43 @@ type MetricViolatedCountCluster struct {
 	MetricName string
 	// ClusterLevel indicates the count voilated for a metric on a cluster for a time period.
 	ClusterLevel MetricViolatedCount
-	// NodeLevel indicates the list of the count voilated for a metric on a node for a time period.
+	// NodeLevel indicates the list of the count voilated for a metric on all the node for a time period.
 	NodeLevel []MetricViolatedCountNode
 }
+
+// Input:
+//
+//	metricName: The Name of the metric for which the Cluster Average will be calculated(string).
+//  decisionPeriod: The evaluation period for which the Average will be calculated.
+//
+// Description:
+//
+//	GetClusterAvg will use the opensearch query to find out the stats aggregation.
+//  While getting stats aggregation it will pass the metricName and decisionPeriod as an input.
+//  It will populate MetricStatsCluster struct and return it.
+//
+// Return:
+//  Return populated MetricStatsCluster struct.
 
 func GetClusterAvg(metricName string, decisionPeriod int) MetricStatsCluster {
 	var metricStatsCluster MetricStatsCluster
 	return metricStatsCluster
 }
+
+// Input:
+//
+//	metricName: The Name of the metric for which the Cluster Average will be calculated(string).
+//  decisionPeriod: The evaluation period for which the Average will be calculated.(int)
+//  limit: The limit for the particular metric for which the count is calculated.(float32)
+//
+// Description:
+//
+//	GetClusterCount will use the opensearch query to find out the stats aggregation.
+//  While getting stats aggregation it will pass the metricName, decisionPeriod and limit as an input.
+//  It will populate MetricViolatedCountCluster struct and return it.
+//
+// Return:
+//  Return populated MetricViolatedCountCluster struct.
 
 func GetClusterCount(metricName string, decisonPeriod int, limit float32) MetricViolatedCountCluster {
 	var metricViolatedCount MetricViolatedCountCluster
