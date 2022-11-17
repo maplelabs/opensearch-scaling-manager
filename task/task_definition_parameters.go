@@ -73,6 +73,7 @@ func (t TaskDetails) EvaluateTask() {
 			v.PushToRecommendationQueue()
 		} else {
 			fmt.Printf("The %s task is not recommended as rules are not satisfied", v.TaskName)
+			fmt.Println()
 		}
 	}
 }
@@ -89,6 +90,7 @@ func (t TaskDetails) EvaluateTask() {
 // Return:
 //
 //	Return if a task can be recommended or not(bool)
+
 func (t Task) GetNextTask() bool {
 	var isRecommendedTask bool = true
 	var isRecommendedRule bool
@@ -97,12 +99,15 @@ func (t Task) GetNextTask() bool {
 		// Here we will add go routine.
 		// So that all the rules getMetrics will be fetched in concurrent way
 		for _, v := range t.Rules {
-			isRecommendedRule := v.GetNextRule()
+			isRecommendedRule = v.GetNextRule()
 			isRecommendedTask = isRecommendedRule && isRecommendedTask
 		}
 	} else if t.Operator == "OR" {
+		// Here we will add go routine.
+		// So that all the rules getMetrics will be fetched in concurrent way
+		// There is a possibility that each rule is taking time and the matching rule may be at last in or condition
 		for _, v := range t.Rules {
-			isRecommendedRule := v.GetNextRule()
+			isRecommendedRule = v.GetNextRule()
 			if isRecommendedRule {
 				break
 			}
@@ -190,13 +195,13 @@ func (r Rule) EvaluateRule(clusterMetric []byte) bool {
 		if err != nil {
 			log.Fatal("Error converting struct to json: ", err)
 		}
-		if r.Stat == "COUNT" || r.Stat == "TERM" {
+		if r.Stat == "COUNT" {
 			if clusterStats.ClusterLevel.ViolatedCount > r.Occurences {
 				return true
 			} else {
 				return false
 			}
-		} else {
+		} else if r.Stat == "TERM" {
 			if clusterStats.ClusterLevel.ViolatedCount > int(r.Limit) {
 				return true
 			} else {
@@ -215,4 +220,5 @@ func (r Rule) EvaluateRule(clusterMetric []byte) bool {
 
 func (task Task) PushToRecommendationQueue() {
 	fmt.Printf("The %s task is recommended and will be pushed to the queue", task.TaskName)
+	fmt.Println()
 }
