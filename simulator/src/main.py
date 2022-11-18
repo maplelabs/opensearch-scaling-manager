@@ -3,14 +3,12 @@
 # under varies loading conditions
 
 
-def read_config(config_file):
-    """
-    Read and parse the configs in dict
-    :param config_file:
-    :return:
-    """
+from config_parser import parse_config
+from simulator import Simulator
 
 
-# Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    read_config('config.json')
+    stats, events = parse_config('config.json')
+    simulator = Simulator(events)
+    data_points = simulator.aggregate_data(24*60)
+    print(data_points)

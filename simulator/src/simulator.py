@@ -1,5 +1,5 @@
 from event import Event
-
+import matplotlib.pyplot as plt
 
 class Stat:
     """
@@ -108,8 +108,8 @@ class Simulator:
     def __init__(
             self,
             events: list[Event],
-            node_stat: NodeStat,
-            cluster_stat: ClusterStat,
+            node_stat: NodeStat = None,
+            cluster_stat: ClusterStat = None,
             elapsed_time_minutes: int = 0,
     ):
         """
@@ -125,5 +125,28 @@ class Simulator:
         self.node_stat = node_stat
         self.cluster_stat = cluster_stat
 
-    def simulate_data(self, duration):
-        pass
+    def aggregate_data(self, duration_minutes):
+
+        # first collect all data aggregation events
+        resultant_y = 0
+        for eve in self.events:
+            print(eve.name)
+            if eve.name == 'ingestion':
+                x, y = eve.data_aggregation_points(
+                    start_time_hh_mm_ss='000000',
+                    duration_minutes=24*60,
+                    frequency_minutes=5
+                )
+                resultant_y += y
+        font1 = {'family': 'serif', 'color': 'red', 'size': 15}
+        font2 = {'family': 'serif', 'color': 'darkred', 'size': 10}
+        plt.plot(x, resultant_y)
+        # plt.xlim([0, duration_minutes])  # set range for x axis
+        # plt.ylim([0, 60])  # set range for x axis
+        plt.xlabel('Time (in minutes) -->', font2)
+        # plt.ylabel('Ingestion Rate (in GB/hr)', font2)
+        plt.title('Resultant Load', font1)
+        plt.grid()
+
+        plt.show()
+

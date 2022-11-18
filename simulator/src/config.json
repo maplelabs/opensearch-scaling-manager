@@ -11,24 +11,34 @@
     "index_clean_up_age_days": 20
   },
   "events": [
-    {
-      "type": "ingestion",
-      "pattern": "sawtooth",
+    {"type": "ingestion",
+      "pattern": "fixed",
       "pattern_params": {
-        "ingestion_rate_gb_per_hour": 20,
-        "max": "10%",
-        "min": "1%",
-        "time_of_max": "12 PM",
-        "time_of_min": "10 PM"
+        "states": [
+          {
+            "ingestion_rate_gb_per_hr": 20,
+            "time_hh_mm_ss": "08_00_00"
+          },
+          {
+            "time_hh_mm_ss": "12_00_00",
+            "ingestion_rate_gb_per_hr": 60
+          },
+          {
+            "time_hh_mm_ss": "18_00_00",
+            "ingestion_rate_gb_per_hr": 65
+          },
+          {
+            "time_hh_mm_ss": "24_00_00",
+            "ingestion_rate_gb_per_hr": 15
+          }
+        ]
       }
     },
     {
       "type": "ingestion",
       "pattern": "random",
       "pattern_params": {
-        "ingestion_rate_gb_per_hour": 20,
-        "max": "10%",
-        "min": "1%"
+        "ingestion_rate_gb_per_hr": 20
       }
     },
     {
