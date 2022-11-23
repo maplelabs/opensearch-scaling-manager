@@ -34,9 +34,9 @@ type Rule struct {
 	Limit float32 `yaml:"limit"`
 	// Stat indicates the statistics on which the evaluation of the rule will happen.
 	// For Cpu and Mem the values can be:
-	// 	Avg: The average CPU or MEM value will be calculated for a given decision period.
-	//  Count: The number of occurences where CPU or MEM value crossed the threshold limit.
-	//  Term:
+	//		Avg: The average CPU or MEM value will be calculated for a given decision period.
+	//		Count: The number of occurences where CPU or MEM value crossed the threshold limit.
+	//		Term:
 	// For rule: Shard, the stat will not be applicable as the shard will be calculated across the cluster and is not a statistical value.
 	Stat string `yaml:"stat"`
 	// DecisionPeriod indicates the time in minutes for which a rule is evalated.
@@ -61,11 +61,12 @@ type TaskDetails struct {
 // Caller: Object of TaskDetails
 // Description:
 //
-//	EvaluateTask will go through all the tasks one by one. and
-//	It check if the task are meeting the criteria based on rules and operator.
-//	If the task is meeting the criteria then it will push the task to recommendation queue.
+//		EvaluateTask will go through all the tasks one by one. and
+//		It check if the task are meeting the criteria based on rules and operator.
+//		If the task is meeting the criteria then it will push the task to recommendation queue.
 //
 // Return:
+
 func (t TaskDetails) EvaluateTask() {
 	for _, v := range t.Tasks {
 		isRecommendeTask := v.GetNextTask()
@@ -82,14 +83,14 @@ func (t TaskDetails) EvaluateTask() {
 // Caller: Object of Task
 // Description:
 //
-//	GetNextTask will get the Task and iterate through all the rules inside the task.
-//	Based on the operator it will check if it should iterate through all the rules or not.
-//	It will call GetNextRule while iterating through the rules.
-//	Based on the result GetNextTask will check if a task can be recommended or not.
+//		GetNextTask will get the Task and iterate through all the rules inside the task.
+//		Based on the operator it will check if it should iterate through all the rules or not.
+//		It will call GetNextRule while iterating through the rules.
+//		Based on the result GetNextTask will check if a task can be recommended or not.
 //
 // Return:
 //
-//	Return if a task can be recommended or not(bool)
+//		Return if a task can be recommended or not(bool)
 
 func (t Task) GetNextTask() bool {
 	var isRecommendedTask bool = true
@@ -121,11 +122,11 @@ func (t Task) GetNextTask() bool {
 // Caller: Object of Rule
 // Description:
 //
-// 	GetNextRule will fetch the metrics based on the rules MetricName and Stats using GetMetrics
-//  Then it will evaluate if the rule is meeting the criteria or not using EvaluateRule
+//		GetNextRule will fetch the metrics based on the rules MetricName and Stats using GetMetrics
+//		Then it will evaluate if the rule is meeting the criteria or not using EvaluateRule
 //
 // Return:
-//	Return if a rule is meeting the criteria or not(bool)
+//		Return if a rule is meeting the criteria or not(bool)
 
 func (r Rule) GetNextRule() bool {
 	cluster := r.GetMetrics()
@@ -137,13 +138,13 @@ func (r Rule) GetNextRule() bool {
 // Caller: Object of Rule
 // Description:
 //
-//	GetMetrics will be getting the metrics for a metricName based on its stats
-//  If the stat is Avg then it will call GetClusterAvg which will provide MetricViolatedCountCluster struct.
-// 	If the stat is Count or Term then it will call GetClusterCount which will provide MetricViolatedCountCluster struct.
-// 	At last it marshal the structure such that uniform data can be used across multiple methods.
+//		GetMetrics will be getting the metrics for a metricName based on its stats
+//		If the stat is Avg then it will call GetClusterAvg which will provide MetricViolatedCountCluster struct.
+//		If the stat is Count or Term then it will call GetClusterCount which will provide MetricViolatedCountCluster struct.
+//		At last it marshal the structure such that uniform data can be used across multiple methods.
 //
 // Return:
-//  Return marshal form of either MetricStatsCluster or MetricViolatedCountCluster struct([]byte)
+//		Return marshal form of either MetricStatsCluster or MetricViolatedCountCluster struct([]byte)
 
 func (r Rule) GetMetrics() []byte {
 	var clusterStats cluster.MetricStatsCluster
@@ -172,10 +173,10 @@ func (r Rule) GetMetrics() []byte {
 // Caller: Object of Rule
 // Description:
 //
-//	EvaluateRule will be compare the collected metric and mentioned rule
-//	It will then decide if rules are meeting the criteria or not and return the result.
+//		EvaluateRule will be compare the collected metric and mentioned rule
+//		It will then decide if rules are meeting the criteria or not and return the result.
 // Return:
-//  Return whether a rule is meeting the criteria or not(bool)
+//		Return whether a rule is meeting the criteria or not(bool)
 
 func (r Rule) EvaluateRule(clusterMetric []byte) bool {
 	if r.Stat == "AVG" {
@@ -215,7 +216,9 @@ func (r Rule) EvaluateRule(clusterMetric []byte) bool {
 // Input:
 // Caller: Object of Task
 // Description:
-// 	PushToRecommendationQueue will be pushing the task which matches the criteria to recommendation queue.
+//
+//		PushToRecommendationQueue will be pushing the task which matches the criteria to recommendation queue.
+//
 // Return:
 
 func (task Task) PushToRecommendationQueue() {

@@ -60,12 +60,12 @@ type ClusterStatic struct {
 type ClusterDynamic struct {
 	// NumNodes indicates the number of nodes present in the OpenSearch cluster at any time.
 	NumNodes int
-	// ClusterStatus indicates the present state of a cluster.
-	// 	red: One or more primary shards are unassigned, so some data is unavailable.
+	//	ClusterStatus indicates the present state of a cluster.
+	//	red: One or more primary shards are unassigned, so some data is unavailable.
 	//		This can occur briefly during cluster startup as primary shards are assigned.
-	//  yellow: All primary shards are assigned, but one or more replica shards are unassigned.
+	//	yellow: All primary shards are assigned, but one or more replica shards are unassigned.
 	//		If a node in the cluster fails, some data could be unavailable until that node is repaired.
-	//  green: All shards are assigned.
+	//	green: All shards are assigned.
 	ClusterStatus string
 	// NumActiveShards indicates the total number of active primary and replica shards.
 	NumActiveShards int
@@ -147,17 +147,17 @@ type MetricViolatedCountCluster struct {
 
 // Input:
 //
-//	metricName: The Name of the metric for which the Cluster Average will be calculated(string).
-//  decisionPeriod: The evaluation period for which the Average will be calculated.
+//		metricName: The Name of the metric for which the Cluster Average will be calculated(string).
+//		decisionPeriod: The evaluation period for which the Average will be calculated.
 //
 // Description:
 //
-//	GetClusterAvg will use the opensearch query to find out the stats aggregation.
-//  While getting stats aggregation it will pass the metricName and decisionPeriod as an input.
-//  It will populate MetricStatsCluster struct and return it.
+//		GetClusterAvg will use the opensearch query to find out the stats aggregation.
+//		While getting stats aggregation it will pass the metricName and decisionPeriod as an input.
+//		It will populate MetricStatsCluster struct and return it.
 //
 // Return:
-//  Return populated MetricStatsCluster struct.
+//		Return populated MetricStatsCluster struct.
 
 func GetClusterAvg(metricName string, decisionPeriod int) MetricStatsCluster {
 	var metricStatsCluster MetricStatsCluster
@@ -166,20 +166,72 @@ func GetClusterAvg(metricName string, decisionPeriod int) MetricStatsCluster {
 
 // Input:
 //
-//	metricName: The Name of the metric for which the Cluster Average will be calculated(string).
-//  decisionPeriod: The evaluation period for which the Average will be calculated.(int)
-//  limit: The limit for the particular metric for which the count is calculated.(float32)
+//		metricName: The Name of the metric for which the Cluster Average will be calculated(string).
+//		decisionPeriod: The evaluation period for which the Average will be calculated.(int)
+//		limit: The limit for the particular metric for which the count is calculated.(float32)
 //
 // Description:
 //
-//	GetClusterCount will use the opensearch query to find out the stats aggregation.
-//  While getting stats aggregation it will pass the metricName, decisionPeriod and limit as an input.
-//  It will populate MetricViolatedCountCluster struct and return it.
+//		GetClusterCount will use the opensearch query to find out the stats aggregation.
+//		While getting stats aggregation it will pass the metricName, decisionPeriod and limit as an input.
+//		It will populate MetricViolatedCountCluster struct and return it.
 //
 // Return:
-//  Return populated MetricViolatedCountCluster struct.
+//		Return populated MetricViolatedCountCluster struct.
 
 func GetClusterCount(metricName string, decisonPeriod int, limit float32) MetricViolatedCountCluster {
 	var metricViolatedCount MetricViolatedCountCluster
+	return metricViolatedCount
+}
+
+// Input:
+// Description:
+//
+//		GetClusterCurrent will fetch the node level and cluster level metrics and fill in
+//		ClusterDynamic, clusterStatic and Node struct using the given config file.
+//		It will return the current cluster status.
+//
+// Return:
+//		Return populated Cluster struct.
+
+func GetClusterCurrent() Cluster {
+	var clusterCurrent Cluster
+	return clusterCurrent
+}
+
+// Input:
+//
+//		decisionPeriod: The evaluation period for which the Average will be calculated.(int)
+//
+// Description:
+//
+//		GetClusterHistoricAvg will get Historic average for the cluster for all the metrics.
+//		GetClusterHistoricAvg will use the stats aggregation to fetch the cluster and node level
+//		Historic average for the mentioned decision period.
+//
+// Return:
+//		Return an array of populated MetricStatsCluster struct collected for all the metrics.
+
+func GetClusterHistoricAvg(decisonPeriod int) []MetricStatsCluster {
+	var metricStatsCluster []MetricStatsCluster
+	return metricStatsCluster
+}
+
+// Input:
+//
+//		decisionPeriod: The evaluation period for which the Average will be calculated.(int)
+//		thresholdMap: The map provide mapping of metric name and the threshold for which the Count is calculated.
+//
+// Description:
+//
+//		GetClusterHistoricCount will use the opensearch query to find out the Count for which a metric crossed the threshold limit.
+//		GetClusterHistoricCount will then iterate through all the metric and collect the count for all the metrics.
+//		It will return the array of node level and cluster level count been voilated for all the metrics.
+//
+// Return:
+//		Return array of populated MetricViolatedCountCluster struct.
+
+func GetClusterHistoricCount(decisionPeriod int, thresholdMap map[string]int) []MetricViolatedCountCluster {
+	var metricViolatedCount []MetricViolatedCountCluster
 	return metricViolatedCount
 }
