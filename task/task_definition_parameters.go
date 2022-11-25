@@ -96,6 +96,11 @@ func (t Task) GetNextTask() bool {
 	var isRecommendedTask bool = true
 	var isRecommendedRule bool
 
+	// We should have a mechanism to check if we have enough data points for evaluating the rules.
+	// If we do not have enough data point for evaluating rule then we should not recommend the task.
+	// In case of AND condition if we do not have enough data point for even one rule then the for
+	// loop should be broken.
+	// This can be considered while implementation.
 	if t.Operator == "AND" {
 		// Here we will add go routine.
 		// So that all the rules getMetrics will be fetched in concurrent way

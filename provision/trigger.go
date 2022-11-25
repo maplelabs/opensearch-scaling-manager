@@ -8,18 +8,22 @@ import (
 // Input:
 // Description:
 //
-//	getRecommendation will fetch the recommendation from recommendation queue and clear the queue.
+//	GetRecommendation will fetch the recommendation from recommendation queue and clear the queue.
 //	It will populate the command queue which contains all the details to scale out the cluster.
 //
 // Return:
-//
-//	getRecommendation will return the command struct which will contains all the details to scale out the cluster.
-func getRecommendation() Command {
+func GetRecommendation() {
 	var command Command
+	clusterCurrent := cluster.GetClusterCurrent()
+	state := getState()
 	// Fetch the recommendation from the queue
 	// Queue can be stored as document in OS, localy stored data structure or in cache memory.
-	// Clear the recommendation queue
-	return command
+	if clusterCurrent.ClusterDynamic.ClusterStatus == "green" && state.CurrentState == "normal" {
+		// Clear the recommendation queue
+	}
+	// Fill in the command struct with the recommendation queue and config file and trigger the recommendation.
+
+	command.triggerRecommendation()
 }
 
 // Input:
@@ -29,18 +33,14 @@ func getRecommendation() Command {
 //	and cluster and trigger the provisioning.
 //
 // Return:
-func triggerRecommendation() {
-	command := getRecommendation()
+func (c *Command) triggerRecommendation() {
 	clusterCurrent := cluster.GetClusterCurrent()
 	state := getState()
-	if clusterCurrent.ClusterDynamic.ClusterStatus == "green" ||
-		clusterCurrent.ClusterDynamic.NumRelocatingShards == 0 {
-		if state.CurrentState != "provisioning" && state.CurrentState != "provision" {
-			setState("provision", state.CurrentState)
-			go command.Provision()
-		} else {
-			fmt.Println("Recommendation can not be provisioned as open search cluster is already in provisioning phase.")
-		}
+	if clusterCurrent.ClusterDynamic.ClusterStatus == "green" && state.CurrentState == "normal" {
+		setState("provision", state.CurrentState)
+		go c.Provision()
+	} else {
+		fmt.Println("Recommendation can not be provisioned as open search cluster is already in provisioning phase.")
 	}
 }
 

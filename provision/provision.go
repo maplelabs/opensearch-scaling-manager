@@ -4,18 +4,23 @@ package provision
 
 import (
 	"scaling_manager/cluster"
+	"scaling_manager/config"
 	"time"
 )
 
 var counter uint8 = 1
 
 // This struct contains the State of the opensearch scaling manager
-// States can be following:
-//  1. provision
-//  2. provisioning
-//  3. provisioning_completed
-//  4. provisioning_failed
-//  5. provisioned_successfully
+// States can be of following types:
+//  1. normal : This is the state when the recommnedation will be provisioned.
+//  2. provision : Once the trigger module will call provision it will set this state.
+//  3. provisioning : Once the provision module will start provisioning it will set this state.
+//  4. provisioning_completed: Once the provision is completed then this state will be state.
+//  5. provisioning_failed: If the provision is failed then this state will be set.
+//  6. provisioned_successfully: If the provision is completed and cluster state is green then
+//     this state will be set.
+//  7. provisioned_failed: If the provision is completed and the cluster state is not green after
+//     certain retries then this state will be set.
 type State struct {
 	// CurrentState indicate the current state of the scaling manager
 	CurrentState string
@@ -23,22 +28,6 @@ type State struct {
 	PreviousState string
 	// Remark indicates the additional remarks for the state of the scaling manager
 	Remark string
-}
-
-// This struct contains the OS Admin Username and OS Admin Password via which we can connect to OS cluster.
-type OsCredentials struct {
-	// OsAdminUsername indicates the OS Admin Username via which OS client can connect to OS Cluster.
-	OsAdminUsername string `yaml:"os_admin_username"`
-	// OsAdminPassword indicates the OS Admin Password via which OS client can connect to OS Cluster.
-	OsAdminPassword string `yaml:"os_admin_password"`
-}
-
-// This struct contains the Cloud Secret Key and Access Key via which we can connect to the cloud.
-type CloudCredentials struct {
-	// SecretKey indicates the Secret key for connecting to the cloud.
-	SecretKey string `yaml:"secret_key"`
-	// AccessKey indicates the Access key for connecting to the cloud.
-	AccessKey string `yaml:"access_key"`
 }
 
 // This struct contains the operation and details to scale the cluster
@@ -51,8 +40,8 @@ type Command struct {
 	// NumNodes indicates the number of nodes need to be scaled in or out.
 	NumNodes int
 	cluster.ClusterStatic
-	OsCredentials    OsCredentials    `yaml:"os_credentials"`
-	CloudCredentials CloudCredentials `yaml:"cloud_credentials"`
+	OsCredentials    config.OsCredentials    `yaml:"os_credentials"`
+	CloudCredentials config.CloudCredentials `yaml:"cloud_credentials"`
 }
 
 // Input:
@@ -149,9 +138,9 @@ func (c *Command) scaleIn(numNodes int) bool {
 // Return:
 func checkClusterHealth() {
 	cluster := cluster.GetClusterCurrent()
-	if cluster.ClusterDynamic.ClusterStatus == "green" &&
-		cluster.ClusterDynamic.NumRelocatingShards == 0 {
-		setState("provisioned_successfully", "provision_completed")
+	if cluster.ClusterDynamic.ClusterStatus == "green" {
+		state := getState()
+		setState("provisioned_successfully", state.CurrentState)
 	} else if counter >= 3 {
 		time.Sleep(180 * time.Second)
 		checkClusterHealth()
@@ -159,4 +148,7 @@ func checkClusterHealth() {
 		state := getState()
 		setState("provisioned_failed", state.CurrentState)
 	}
+	// We should wait for buffer period after provisioned_successfully state to stablize the cluster.
+	// After that buffer period we should change the state to normal, which can tell trigger module to trigger
+	// the recommendation.
 }
