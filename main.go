@@ -43,7 +43,7 @@ func periodicProvisionCheck() {
                 current_master := cluster.GetCurrentMasterIp()
                 if strings.HasPrefix(state.CurrentState, "provision") {
 	                if cluster.CheckIfMaster() {
-                                if previous_master == current_master {
+                                if previous_master != current_master {
                                         // Create a new command struct and call the scaleIn or scaleOut functions
                                         // Call these scaleOut and scaleIn functions using goroutines so that this periodic check continues
                                         // command struct to be filled with the recommendation queue and config file
