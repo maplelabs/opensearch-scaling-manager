@@ -235,3 +235,31 @@ func GetClusterHistoricCount(decisionPeriod int, thresholdMap map[string]int) []
 	var metricViolatedCount []MetricViolatedCountCluster
 	return metricViolatedCount
 }
+
+
+// Input:
+//
+// Description:
+//		Calls ES Api to find the current master node in the cluster
+//
+// Return:
+//              Returns the Ip of current master node
+
+func GetCurrentMasterIp() string {
+	return "10.81.1.225"
+}
+
+// Input:
+//
+// Description:
+//              Calls ES Api to check if the current node is the master node of the cluster
+//
+// Return:
+//              Returns true/false based on the return of API
+
+func CheckIfMaster() bool {
+	var currentNode Node
+	// For testing
+	currentNode.IsMaster = true
+	return currentNode.IsMaster
+}

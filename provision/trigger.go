@@ -15,7 +15,7 @@ import (
 func GetRecommendation() {
 	var command Command
 	clusterCurrent := cluster.GetClusterCurrent()
-	state := getState()
+	state := GetState()
 	// Fetch the recommendation from the queue
 	// Queue can be stored as document in OS, localy stored data structure or in cache memory.
 	if clusterCurrent.ClusterDynamic.ClusterStatus == "green" && state.CurrentState == "normal" {
@@ -35,7 +35,7 @@ func GetRecommendation() {
 // Return:
 func (c *Command) triggerRecommendation() {
 	clusterCurrent := cluster.GetClusterCurrent()
-	state := getState()
+	state := GetState()
 	if clusterCurrent.ClusterDynamic.ClusterStatus == "green" && state.CurrentState == "normal" {
 		setState("provision", state.CurrentState)
 		go c.Provision()
@@ -47,13 +47,14 @@ func (c *Command) triggerRecommendation() {
 // Input:
 // Description:
 //
-//	getState will get the state of provisioning system of the scaling manager.
+//	GetState will get the state of provisioning system of the scaling manager.
 //
 // Return:
 //
 //	Return the State struct populated by the function which contains the current state and previous state.
-func getState() State {
+func GetState() State {
 	var state State
+	state.CurrentState = "provisioning_scaledown"
 	return state
 }
 

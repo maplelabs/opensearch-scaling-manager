@@ -6,6 +6,7 @@ import (
 	"scaling_manager/cluster"
 	"scaling_manager/config"
 	"time"
+	"fmt"
 )
 
 var counter uint8 = 1
@@ -13,10 +14,10 @@ var counter uint8 = 1
 // This struct contains the State of the opensearch scaling manager
 // States can be of following types:
 //  1. normal : This is the state when the recommnedation will be provisioned.
-//  2. provision : Once the trigger module will call provision it will set this state.
-//  3. provisioning : Once the provision module will start provisioning it will set this state.
-//  4. provisioning_completed: Once the provision is completed then this state will be state.
-//  5. provisioning_failed: If the provision is failed then this state will be set.
+//  2. provision_scaleup/provision_scaledown : Once the trigger module will call provision it will set this state.
+//  3. provisioning_scaleup/provisioning_scaledown : Once the provision module will start provisioning it will set this state.
+//  4. provisioning_scaleup_completed/provisioning_scaledown_completed : Once the provision is completed then this state will be state.
+//  5. provisioning_scaleup_failed/provisioning_scaledown_failed: If the provision is failed then this state will be set.
 //  6. provisioned_successfully: If the provision is completed and cluster state is green then
 //     this state will be set.
 //  7. provisioned_failed: If the provision is completed and the cluster state is not green after
@@ -57,27 +58,27 @@ type Command struct {
 //
 // Return:
 func (c *Command) Provision() {
-	state := getState()
+	state := GetState()
 	setState("provisioning", state.CurrentState)
 	if c.Operation == "scale_up" {
-		isScaledUp := c.scaleOut(1)
+		isScaledUp := c.ScaleOut(1)
 		if isScaledUp {
-			state = getState()
+			state = GetState()
 			setState("provision_completed", state.CurrentState)
 			checkClusterHealth()
 		} else {
-			state = getState()
+			state = GetState()
 			// Add a retry mechanism
 			setState("provision_failed", state.CurrentState)
 		}
 	} else if c.Operation == "scale_down" {
-		isScaledDown := c.scaleIn(1)
+		isScaledDown := c.ScaleIn(1)
 		if isScaledDown {
-			state = getState()
+			state = GetState()
 			setState("provision_completed", state.CurrentState)
 			checkClusterHealth()
 		} else {
-			state = getState()
+			state = GetState()
 			// Add a retry mechanism
 			setState("provision_failed", state.CurrentState)
 		}
@@ -98,11 +99,28 @@ func (c *Command) Provision() {
 // Return:
 //
 //	Return the status of scale out of the nodes.
-func (c *Command) scaleOut(numNodes int) bool {
-	// Spin new VMs based on number of nodes and cloud type
-	// Add the newly added VM to the list of VMs
-	// Configure OS on newly created VM
-	// Check cluster status after the configuration
+func (c *Command) ScaleOut(numNodes int) bool {
+	// Read the current state of scaleup process and proceed with next step
+	scaleup_stage := readStageFromEs()
+	switch scaleup_stage {
+		// Spin new VMs based on number of nodes and cloud type
+		case "start_scaleup_process":
+			fmt.Println("Spin new vms based on the cloud type")
+			scaleup_stage = "scaleup_triggered_spin_vm"
+		// Add the newly added VM to the list of VMs
+		// Configure OS on newly created VM
+		case "scaleup_triggered_spin_vm":
+			fmt.Println("Check if the vm creation is complete and wait till done")
+			fmt.Println("Add the spinned nodes into the list of vms")
+			fmt.Println("Configure ES")
+			scaleup_stage = "scaleup_configured"
+		// Check cluster status after the configuration
+		case "scaleup_configured":
+			fmt.Println("Wait for the cluster health and return status")
+			scaleup_stage = "scaleup_complete"
+		default:
+			fmt.Println("ScaleOut function called")
+	}
 	return true
 }
 
@@ -119,12 +137,29 @@ func (c *Command) scaleOut(numNodes int) bool {
 // Return:
 //
 //	Return the status of scale in of the nodes.
-func (c *Command) scaleIn(numNodes int) bool {
-	// Identify the node which can be removed from the cluster.
-	// Configure OS to tell master node that the present node is going to be removed
-	// Wait for cluster to be in stable state(Shard rebalance)
-	// Shut down the node
-	// Check cluster status after shutting down the node
+func (c *Command) ScaleIn(numNodes int) bool {
+        // Read the current state of scaledown process and proceed with next step
+        scaledown_stage := readStageFromEs()
+
+	switch scaledown_stage {
+		// Identify the node which can be removed from the cluster.
+		case "start_scaledown_process":
+			fmt.Println("Identify the node to remove from the cluster and store the node_ip")
+			scaledown_stage = "scaledown_node_identified"
+		// Configure OS to tell master node that the present node is going to be removed
+		case "scaledown_node_identified":
+			fmt.Println("Configure ES to remove the node ip from cluster")
+			fmt.Println("Start ES service on the node")
+			scaledown_stage = "scaledown_es_configured"
+		// Wait for cluster to be in stable state(Shard rebalance)
+		// Shut down the node
+		case "scaledown_es_configured":
+	                fmt.Println("Wait for the cluster to become healthy (in a loop) and then proceed")
+	                fmt.Println("Shutdown the node")
+		        scaledown_stage = "scaledown_complete"
+		default:
+			fmt.Println("ScaleDown function called")
+	}
 	return true
 }
 
@@ -139,16 +174,25 @@ func (c *Command) scaleIn(numNodes int) bool {
 func checkClusterHealth() {
 	cluster := cluster.GetClusterCurrent()
 	if cluster.ClusterDynamic.ClusterStatus == "green" {
-		state := getState()
+		state := GetState()
 		setState("provisioned_successfully", state.CurrentState)
 	} else if counter >= 3 {
 		time.Sleep(180 * time.Second)
 		checkClusterHealth()
 	} else {
-		state := getState()
+		state := GetState()
 		setState("provisioned_failed", state.CurrentState)
 	}
 	// We should wait for buffer period after provisioned_successfully state to stablize the cluster.
 	// After that buffer period we should change the state to normal, which can tell trigger module to trigger
 	// the recommendation.
+}
+
+// Input:
+// Description:
+//		Read the current stage that the provisioning process is in from Elasticsearch or any centralized DB which will be updated after each stage.
+// Return: Stage returned from ES
+
+func readStageFromEs() string {
+	return "scaledown_es_configured"
 }
