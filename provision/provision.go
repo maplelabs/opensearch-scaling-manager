@@ -59,28 +59,29 @@ type Command struct {
 // Return:
 func (c *Command) Provision() {
 	state := GetState()
-	setState("provisioning", state.CurrentState)
 	if c.Operation == "scale_up" {
+		setState("provisioning_scaleup", state.CurrentState)
 		isScaledUp := c.ScaleOut(1)
 		if isScaledUp {
 			state = GetState()
-			setState("provision_completed", state.CurrentState)
+			setState("provisioning_scaleup_completed", state.CurrentState)
 			checkClusterHealth()
 		} else {
 			state = GetState()
 			// Add a retry mechanism
-			setState("provision_failed", state.CurrentState)
+			setState("provisioning_scaleup_failed", state.CurrentState)
 		}
 	} else if c.Operation == "scale_down" {
+		setState("provisioning_scaledown", state.CurrentState)
 		isScaledDown := c.ScaleIn(1)
 		if isScaledDown {
 			state = GetState()
-			setState("provision_completed", state.CurrentState)
+			setState("provisioning_scaledown_completed", state.CurrentState)
 			checkClusterHealth()
 		} else {
 			state = GetState()
 			// Add a retry mechanism
-			setState("provision_failed", state.CurrentState)
+			setState("provisioning_scaledown_failed", state.CurrentState)
 		}
 	}
 }
@@ -102,24 +103,40 @@ func (c *Command) Provision() {
 func (c *Command) ScaleOut(numNodes int) bool {
 	// Read the current state of scaleup process and proceed with next step
 	scaleup_stage := readStageFromEs()
-	switch scaleup_stage {
-		// Spin new VMs based on number of nodes and cloud type
-		case "start_scaleup_process":
-			fmt.Println("Spin new vms based on the cloud type")
-			scaleup_stage = "scaleup_triggered_spin_vm"
-		// Add the newly added VM to the list of VMs
-		// Configure OS on newly created VM
-		case "scaleup_triggered_spin_vm":
-			fmt.Println("Check if the vm creation is complete and wait till done")
-			fmt.Println("Add the spinned nodes into the list of vms")
-			fmt.Println("Configure ES")
-			scaleup_stage = "scaleup_configured"
-		// Check cluster status after the configuration
-		case "scaleup_configured":
-			fmt.Println("Wait for the cluster health and return status")
-			scaleup_stage = "scaleup_complete"
-		default:
-			fmt.Println("ScaleOut function called")
+	// If no stage was already set. The function returns an empty string. Then, start the scaleup process
+        if scaleup_stage == "" {
+		scaleup_stage = "start_scaleup_process"
+	}
+	// Spin new VMs based on number of nodes and cloud type
+	if scaleup_stage == "start_scaleup_process" {
+		fmt.Println("Spin new vms based on the cloud type")
+		scaleup_stage = "scaleup_triggered_spin_vm"
+	}
+	// Add the newly added VM to the list of VMs
+	// Configure OS on newly created VM
+	if scaleup_stage == "scaleup_triggered_spin_vm" {
+		fmt.Println("Check if the vm creation is complete and wait till done")
+		fmt.Println("Add the spinned nodes into the list of vms")
+		fmt.Println("Configure ES")
+		scaleup_stage = "scaleup_configured"
+	}
+	// Check cluster status after the configuration
+	if scaleup_stage == "scaleup_configured" {
+		fmt.Println("Wait for the cluster health and return status")
+		cluster := cluster.GetClusterCurrent()
+		for i := 0 ; i <= 6; i++ {
+			if cluster.ClusterDynamic.ClusterStatus == "green" {
+				state := GetState()
+				setState("provisioned_successfully", state.CurrentState)
+				scaleup_stage = "scaleup_complete"
+				break
+			}
+			time.Sleep(300 * time.Second)
+		}
+                state := GetState()
+		if state.CurrentState != "provisioned_successfully" {
+	                setState("provisioned_failed", state.CurrentState)
+		}
 	}
 	return true
 }
@@ -140,25 +157,28 @@ func (c *Command) ScaleOut(numNodes int) bool {
 func (c *Command) ScaleIn(numNodes int) bool {
         // Read the current state of scaledown process and proceed with next step
         scaledown_stage := readStageFromEs()
+	// If no stage was already set. The function returns an empty string. Then, start the scaledown process
+	if scaledown_stage == "" {
+		scaledown_stage = "start_scaledown_process"
+	}
 
-	switch scaledown_stage {
-		// Identify the node which can be removed from the cluster.
-		case "start_scaledown_process":
-			fmt.Println("Identify the node to remove from the cluster and store the node_ip")
-			scaledown_stage = "scaledown_node_identified"
-		// Configure OS to tell master node that the present node is going to be removed
-		case "scaledown_node_identified":
-			fmt.Println("Configure ES to remove the node ip from cluster")
-			fmt.Println("Start ES service on the node")
-			scaledown_stage = "scaledown_es_configured"
-		// Wait for cluster to be in stable state(Shard rebalance)
-		// Shut down the node
-		case "scaledown_es_configured":
-	                fmt.Println("Wait for the cluster to become healthy (in a loop) and then proceed")
-	                fmt.Println("Shutdown the node")
-		        scaledown_stage = "scaledown_complete"
-		default:
-			fmt.Println("ScaleDown function called")
+	// Identify the node which can be removed from the cluster.
+	if scaledown_stage == "start_scaledown_process" {
+		fmt.Println("Identify the node to remove from the cluster and store the node_ip")
+		scaledown_stage = "scaledown_node_identified"
+	}
+	// Configure OS to tell master node that the present node is going to be removed
+	if scaledown_stage == "scaledown_node_identified" {
+		fmt.Println("Configure ES to remove the node ip from cluster")
+                fmt.Println("Start ES service on the node")
+                scaledown_stage = "scaledown_es_configured"
+	}
+	// Wait for cluster to be in stable state(Shard rebalance)
+	// Shut down the node
+	if scaledown_stage == "scaledown_es_configured" {
+	        fmt.Println("Wait for the cluster to become healthy (in a loop) and then proceed")
+	        fmt.Println("Shutdown the node")
+		scaledown_stage = "scaledown_complete"
 	}
 	return true
 }
@@ -194,5 +214,5 @@ func checkClusterHealth() {
 // Return: Stage returned from ES
 
 func readStageFromEs() string {
-	return "scaledown_es_configured"
+	return ""
 }
