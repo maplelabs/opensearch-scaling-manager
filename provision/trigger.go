@@ -37,10 +37,14 @@ func (c *Command) triggerRecommendation() {
 	clusterCurrent := cluster.GetClusterCurrent()
 	state := GetState()
 	if clusterCurrent.ClusterDynamic.ClusterStatus == "green" && state.CurrentState == "normal" {
-		setState("provision", state.CurrentState)
+		if c.Operation == "scale_up" {
+			setState("provisioning_scaleup", state.CurrentState)
+		} else if c.Operation == "scale_down" {
+			setState("provisioning_scaledown", state.CurrentState)
+		}
 		go c.Provision()
 	} else {
-		fmt.Println("Recommendation can not be provisioned as open search cluster is already in provisioning phase.")
+		fmt.Println("Recommendation can not be provisioned as open search cluster is already in provisioning phase or the cluster isn't healthy yet")
 	}
 }
 
