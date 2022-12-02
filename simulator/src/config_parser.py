@@ -54,6 +54,7 @@ def parse_config(config_file_path):
         all_configs = yaml.safe_load(fp.read())
 
     except Exception as e:
+        fp.close()
         sys.stdout.write(e)
         sys.stdout.write("Could not read data, please check if all fields are filled")
         return
@@ -74,7 +75,7 @@ def parse_config(config_file_path):
 
     # If the required fields is not present in the config file then do not place it in src/
     else:
-        sys.stdout.write(errors)
+        sys.stdout.write(str(errors))
         sys.stdout.write("Please pass a Valid config file")
         exit()
     data_generation_interval_minutes = all_configs.pop(
