@@ -51,32 +51,32 @@
 	'required':False,
 	'type': 'dict',
 	'schema': {
-	   'states': {
+	  'states': {
 		'required':True,
 		'type':'list',
-            'schema': {
-        'type': 'dict',
-        'schema':{
-				'position':{
-					'required':True,
-					'type':'number'
-					},
-				'time_hh_mm_ss':{
-					'required':True,
-					'type':'string'
-					},
-				'ingestion_rate_gb_per_hr':{
-					'required':True,
-					'type':'number'
-					}
-				}
-            }
-       },
+        'schema': {
+          'type': 'dict',
+          'schema':{
+		    'position':{
+		      'required':True,
+			  'type':'number'
+			},
+			'time_hh_mm_ss':{
+			  'required':True,
+			  'type':'string'
+			},
+			'ingestion_rate_gb_per_hr':{
+			  'required':True,
+			  'type':'number'
+			}
+		  }
+      }
+    },
 	   'randomness_percentage':{
 				'required':True,
 				'type':'number'
-				}
-		    }
+			}
+		}
 },
 'searches':{
     'required':False,
@@ -84,23 +84,23 @@
     'schema': {
     'type':'dict',
     'schema':{
-				'type':{
-					'required':True,
-					'type':'string'
-					},
-				'probability':{
-					'required':True,
-					'type':'number'
-					},
-				'cpu_load_percent':{
-					'required':True,
-					'type':'number'
-					},
-                'memory_load_percent':{
-					'required':True,
-					'type':'number'
-					}
-				}
+	   'type':{
+	     'required':True,
+		 'type':'string'
+		},
+		'probability':{
+		  'required':True,
+		  'type':'number'
+		},
+		'cpu_load_percent':{
+		  'required':True,
+		  'type':'number'
+		},
+        'memory_load_percent':{
+		  'required':True,
+		  'type':'number'
+		}
+	}
 }
 }
 }

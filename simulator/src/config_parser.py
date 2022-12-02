@@ -2,7 +2,7 @@ import yaml
 import sys
 from cerberus import Validator
 from pathlib import Path
-
+import constants as const
 
 class Config:
     def __init__(
@@ -28,7 +28,7 @@ def validate_config(all_configs):
     """
     # Fetching the dir path and appending the schema file path
     current_dir: Path = Path(__file__).parent.resolve()
-    schema_path = str(current_dir) + "\schema.py"
+    schema_path = str(current_dir) + const.SCHEMA_PATH 
     schema = eval(open(schema_path, "r").read())
 
     # validating config file against the schema
@@ -53,7 +53,8 @@ def parse_config(config_file_path):
         # Loading the config file content to dictionary to validate
         all_configs = yaml.safe_load(fp.read())
 
-    except:
+    except Exception as e:
+        sys.stdout.write(e)
         sys.stdout.write("Could not read data, please check if all fields are filled")
         return
 
@@ -67,9 +68,9 @@ def parse_config(config_file_path):
     # If it is a valid config file, Place the file in the simulator/src/main and return
     if is_valid:
         # cwd = os.getcwd()
-        file = open(str(current_dir) + "\config.yaml", "w")
+        file = open(str(current_dir) + const.CONFIG_PATH, "w")
         yaml.dump(all_configs, file, allow_unicode=True)
-        file.close
+        file.close()
 
     # If the required fields is not present in the config file then do not place it in src/
     else:
