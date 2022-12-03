@@ -67,7 +67,7 @@ type TaskDetails struct {
 //
 // Return:
 
-func (t TaskDetails) EvaluateTask() {
+func (t TaskDetails) EvaluateTask() ([]string){
 	for _, v := range t.Tasks {
 		isRecommendeTask := v.GetNextTask()
 		if isRecommendeTask {
@@ -77,6 +77,8 @@ func (t TaskDetails) EvaluateTask() {
 			fmt.Println()
 		}
 	}
+	var recommendation_queue []string
+	return recommendation_queue
 }
 
 // Inputs:

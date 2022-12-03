@@ -3,6 +3,9 @@ package provision
 import (
 	"fmt"
 	"scaling_manager/cluster"
+	"regexp"
+	"scaling_manager/config"
+	"strconv"
 )
 
 // Input:
@@ -12,37 +15,42 @@ import (
 //	It will populate the command queue which contains all the details to scale out the cluster.
 //
 // Return:
-func GetRecommendation() {
-	var command Command
-	clusterCurrent := cluster.GetClusterCurrent()
-	state := GetState()
-	// Fetch the recommendation from the queue
-	// Queue can be stored as document in OS, localy stored data structure or in cache memory.
-	if clusterCurrent.ClusterDynamic.ClusterStatus == "green" && state.CurrentState == "normal" {
-		// Clear the recommendation queue
+func GetRecommendation(state *State, recommendation_queue []string) {
+	scaleRegexString := `(scale_up|down)_by_([0-9]+)`
+	scaleRegex := regexp.MustCompile(scaleRegexString)
+	if len(recommendation_queue) > 0 {
+		clusterCurrent := cluster.GetClusterCurrent()
+		current_state := state.GetCurrentState()
+		if clusterCurrent.ClusterDynamic.ClusterStatus == "green" && current_state == "normal" {
+			var command Command
+			// Fill in the command struct with the recommendation queue and config file and trigger the recommendation.
+			subMatch := scaleRegex.FindStringSubmatch(recommendation_queue[0])
+		        command.NumNodes, _ = strconv.Atoi(subMatch[2])
+		        command.Operation = subMatch[1]
+		        configStruct := config.GetConfig("config.yaml")
+		        command.ClusterDetails = configStruct.ClusterDetails
+			command.triggerRecommendation(state)
+		}
 	}
-	// Fill in the command struct with the recommendation queue and config file and trigger the recommendation.
-
-	command.triggerRecommendation()
 }
 
 // Input:
 // Description:
 //
-//	triggerRecommendation will fetch the recommendation from the queue, get the status of the provisioner
+//	triggerRecommendation will get the status of the provisioner
 //	and cluster and trigger the provisioning.
 //
 // Return:
-func (c *Command) triggerRecommendation() {
+func (c *Command) triggerRecommendation(state *State) {
 	clusterCurrent := cluster.GetClusterCurrent()
-	state := GetState()
-	if clusterCurrent.ClusterDynamic.ClusterStatus == "green" && state.CurrentState == "normal" {
+	current_state := state.GetCurrentState()
+	if clusterCurrent.ClusterDynamic.ClusterStatus == "green" && current_state == "normal" {
 		if c.Operation == "scale_up" {
-			setState("provisioning_scaleup", state.CurrentState)
+			state.SetState("provisioning_scaleup", current_state)
 		} else if c.Operation == "scale_down" {
-			setState("provisioning_scaledown", state.CurrentState)
+			state.SetState("provisioning_scaledown", current_state)
 		}
-		go c.Provision()
+		go c.Provision(state)
 	} else {
 		fmt.Println("Recommendation can not be provisioned as open search cluster is already in provisioning phase or the cluster isn't healthy yet")
 	}
@@ -51,15 +59,16 @@ func (c *Command) triggerRecommendation() {
 // Input:
 // Description:
 //
-//	GetState will get the state of provisioning system of the scaling manager.
+//	GetCurrentState will get the current state of provisioning system of the scaling manager.
 //
 // Return:
 //
-//	Return the State struct populated by the function which contains the current state and previous state.
-func GetState() State {
-	var state State
-	state.CurrentState = "provisioning_scaledown"
-	return state
+//	Returns a string which contains the current state.
+func (s *State) GetCurrentState() string {
+	if s.CurrentState == ""{
+		s.CurrentState = "provisioning_scaledown"
+	}
+	return s.CurrentState
 }
 
 // Input:
@@ -69,13 +78,12 @@ func GetState() State {
 //
 // Description:
 //
-//	setState will set the state of provisioning system of the scaling manager.
+//	SetState will set the state of provisioning system of the scaling manager.
 //
 // Return:
-func setState(currentState string, previousState string) {
+func (s *State) SetState(currentState string, previousState string) {
 	// set the state for the opensearch scaling manager
 	// This state can be either pushed to OS or else kept locally.
-	var state State
-	state.CurrentState = currentState
-	state.PreviousState = previousState
+	s.CurrentState = currentState
+	s.PreviousState = previousState
 }
