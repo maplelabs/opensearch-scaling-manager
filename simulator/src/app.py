@@ -104,6 +104,23 @@ def average(stat_name, duration):
         return Response(str(e), status = 404)
 
 
+# The endpoint returns all the stats from the latest poll, returns error if sufficient data points are not present.
+@app.route('/stats/current')
+def current_all():
+    try:
+       
+        current_cpu = DataModel.query.order_by(desc(DataModel.date_created)).with_entities(
+            DataModel.__getattribute__(DataModel, constants.STAT_REQUEST['cpu'])).all()
+        current_mem = DataModel.query.order_by(desc(DataModel.date_created)).with_entities(
+            DataModel.__getattribute__(DataModel, constants.STAT_REQUEST['mem'])).all()
+        current_status = DataModel.query.order_by(desc(DataModel.date_created)).with_entities(
+            DataModel.__getattribute__(DataModel, constants.STAT_REQUEST['status'])).all()
+        
+        return jsonify({"cpu": current_cpu[0][constants.STAT_REQUEST['cpu']],"mem": current_mem[0][constants.STAT_REQUEST['mem']],"status": current_status[0][constants.STAT_REQUEST['status']]})
+
+    except Exception as e:
+        return Response(str(e), status=404)
+
 # The endpoint returns request stat from the latest poll, returns error if sufficient data points are not present.
 @app.route('/stats/current/<string:stat_name>')
 def current(stat_name):
