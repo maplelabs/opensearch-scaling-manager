@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"scaling_manager/cluster"
 	"scaling_manager/config"
-	log "scaling_manager/logger"
 	"scaling_manager/provision"
 	"scaling_manager/task"
+	"scaling_manager/logger"
 	"strings"
 	"time"
 
@@ -15,6 +15,12 @@ import (
 
 var state = new(provision.State)
 
+var log logger.LOG
+
+func init() {
+	log.Init("logger")
+	log.Info.Println("Main module initialized")
+}
 func main() {
 	// The following go routine will watch the changes inside config.yaml
 	go fileWatch("config.yaml")
@@ -58,33 +64,29 @@ func periodicProvisionCheck() {
 		currentMaster := cluster.CheckIfMaster()
 		if state.CurrentState != "normal" {
 			if !(previousMaster) && currentMaster {
-				// Create a new command struct and call the scaleIn or scaleOut functions
-				// Call these scaleOut and scaleIn functions using goroutines so that this periodic check continues
-				// command struct to be filled with the recommendation queue and config file
-				var command provision.Command
 				configStruct, err := config.GetConfig("config.yaml")
 				if err != nil {
-					log.Warn(log.ProvisionerWarn, "Unable to get Config from GetConfig()")
+					log.Warn.Println("Unable to get Config from GetConfig()", err)
 					return
 				}
-				command.ClusterDetails = configStruct.ClusterDetails
+				cfg := configStruct.ClusterDetails
 				if strings.Contains(state.CurrentState, "scaleup") {
-					log.Info("Calling scaleOut")
-					isScaledUp := command.ScaleOut(state)
+					log.Info.Println("Calling scaleOut")
+					isScaledUp := provision.ScaleOut(cfg, state)
 					if isScaledUp {
-						log.Info("Scaleup completed successfully")
+						log.Info.Println("Scaleup completed successfully")
 					} else {
 						// Add a retry mechanism
-						log.Warn("Scaleup failed")
+						log.Warn.Println("Scaleup failed")
 					}
 				} else if strings.Contains(state.CurrentState, "scaledown") {
-					log.Info("Calling scaleIn")
-					isScaledDown := command.ScaleIn(state)
+					log.Info.Println("Calling scaleIn")
+					isScaledDown := provision.ScaleIn(cfg, state)
 					if isScaledDown {
-						log.Info("Scaledown completed successfully")
+						log.Info.Println("Scaledown completed successfully")
 					} else {
 						// Add a retry mechanism
-						log.Warn("Scaledown failed")
+						log.Warn.Println("Scaledown failed")
 					}
 				}
 			}
