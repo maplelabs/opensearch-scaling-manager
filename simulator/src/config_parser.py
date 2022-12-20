@@ -88,6 +88,7 @@ def parse_config(config_file_path):
     data_ingestion = all_configs.pop(const.DATA_INGESTION)
     searches = all_configs.pop(const.SEARCHES)
     stats = all_configs
+    
     return Config(stats, data_ingestion, searches, data_generation_interval_minutes)
 
 
