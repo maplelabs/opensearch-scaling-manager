@@ -31,6 +31,8 @@ class Cluster:
             relocating_shards_count: int = 0,
             unassigned_shards_count: int = 0,
             active_shards_count: int = 0,
+            active_primary_shards: int = 0,
+            active_data_nodes: int = 0
     ):
         """
         Initialize the cluster object
@@ -79,6 +81,8 @@ class Cluster:
         self.active_shards = active_shards_count
         self.date_time = datetime.now()
         self._ingestion_rate = 0
+        self.active_primary_shards = active_primary_shards
+        self.active_data_nodes = active_data_nodes
 
     # TODO: Define methods for controlling cluster behaviour,
     #  node addition, removal etc

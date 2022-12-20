@@ -2,7 +2,7 @@ import os
 import shutil
 import json
 from datetime import datetime, timedelta
-
+import re
 from flask import Flask, jsonify, Response, request
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text, desc
@@ -14,6 +14,7 @@ from cluster import Cluster
 from open_search_simulator import Simulator
 from plotter import plot_data_points
 
+global stat_request_current_values
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///datapoints.db'
@@ -29,6 +30,15 @@ class DataModel(db.Model):
     cpu_usage_percent = db.Column(db.Float, default=0)
     memory_usage_percent = db.Column(db.Float, default=0)
     shards_count = db.Column(db.Integer, default=0)
+    status = db.Column(db.String(200))
+    total_nodes_count = db.Column(db.Integer, default=0)
+    active_shards_count = db.Column(db.Integer, default=0)
+    active_primary_shards = db.Column(db.Integer, default=0)
+    initializing_shards_count = db.Column(db.Integer, default=0)
+    unassigned_shards_count = db.Column(db.Integer, default=0)
+    relocating_shards_count = db.Column(db.Integer, default=0)
+    master_eligible_nodes_count = db.Column(db.Integer, default=0)
+    active_data_nodes = db.Column(db.Integer, default=0)
     date_created = db.Column(db.DateTime, default=datetime.now(), primary_key=True)
 
 
@@ -108,18 +118,15 @@ def average(stat_name, duration):
 @app.route('/stats/current')
 def current_all():
     try:
-       
-        current_cpu = DataModel.query.order_by(desc(DataModel.date_created)).with_entities(
-            DataModel.__getattribute__(DataModel, constants.STAT_REQUEST['cpu'])).all()
-        current_mem = DataModel.query.order_by(desc(DataModel.date_created)).with_entities(
-            DataModel.__getattribute__(DataModel, constants.STAT_REQUEST['mem'])).all()
-        current_status = DataModel.query.order_by(desc(DataModel.date_created)).with_entities(
-            DataModel.__getattribute__(DataModel, constants.STAT_REQUEST['status'])).all()
+        stat_dict = {}
+        for key in constants.STAT_REQUEST_CURRENT:
+            value = DataModel.query.order_by(desc(DataModel.date_created)).with_entities(DataModel.__getattribute__(DataModel, constants.STAT_REQUEST_CURRENT[key])).all()
+            stat_dict[key] = value[0][0]
+        return jsonify(stat_dict)
         
-        return jsonify({"cpu": current_cpu[0][constants.STAT_REQUEST['cpu']],"mem": current_mem[0][constants.STAT_REQUEST['mem']],"status": current_status[0][constants.STAT_REQUEST['status']]})
-
     except Exception as e:
         return Response(str(e), status=404)
+
 
 # The endpoint returns request stat from the latest poll, returns error if sufficient data points are not present.
 @app.route('/stats/current/<string:stat_name>')
@@ -188,7 +195,15 @@ if __name__ == "__main__":
             cpu_usage_percent=cluster_obj.cpu_usage_percent,
             memory_usage_percent=cluster_obj.memory_usage_percent,
             date_created=cluster_obj.date_time,
-            status=cluster_obj.status
+            status=cluster_obj.status,
+            total_nodes_count = cluster_obj.total_nodes_count,
+            active_shards_count = cluster_obj.active_shards,
+            active_primary_shards = cluster_obj.active_primary_shards,
+            initializing_shards_count = cluster_obj.initializing_shards,
+            unassigned_shards_count =cluster_obj.unassigned_shards,
+            relocating_shards_count = cluster_obj.relocating_shards,
+            master_eligible_nodes_count = cluster_obj.master_eligible_nodes_count,
+            active_data_nodes = cluster_obj.active_data_nodes
         )
         db.session.add(task)
     db.session.commit()
