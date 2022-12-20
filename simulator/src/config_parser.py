@@ -62,7 +62,8 @@ def parse_config(config_file_path):
 
     except Exception as e:
         fp.close()
-        raise ValidationError("error reading config file - " + str(e))
+        
+        raise ValidationError('error reading config file - ' + str(e))
 
     fp.close()
 
@@ -81,7 +82,8 @@ def parse_config(config_file_path):
 
     # If the required fields is not present in the config file then do not place it in src/
     else:
-        raise ValidationError("Error validating config file - " + str(errors))
+    
+        raise ValidationError('Error validating config file - ' + str(errors))
     data_generation_interval_minutes = all_configs.pop(
         const.DATA_GENERATION_INTERVAL_MINUTES
     )
