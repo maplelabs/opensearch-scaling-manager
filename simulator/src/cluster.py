@@ -11,30 +11,29 @@ class Cluster:
     """
 
     def __init__(
-            self,
-            cluster_name: str,
-            cluster_hostname: str,
-            cluster_ip_address: str,
-            node_machine_type_identifier: str,
-            total_nodes_count: int,
-            data_nodes_count: int,
-            master_eligible_nodes_count: int,
-            index_count: int,
-            shards_per_index: int,
-            index_roll_over_size_gb: int,
-            index_clean_up_age_days: int,
-
-            status: str = "green",
-            cpu_usage_percent: float = 0,
-            memory_usage_percent: float = 0,
-            disk_usage_percent: float = 0,
-            heap_usage_percent: float = 0,
-            total_shard_count: int = 0,
-            initializing_shards_count: int = 0,
-            relocating_shards_count: int = 0,
-            unassigned_shards_count: int = 0,
-            active_shards_count: int = 0,
-            active_primary_shards: int = 0
+        self,
+        cluster_name: str,
+        cluster_hostname: str,
+        cluster_ip_address: str,
+        node_machine_type_identifier: str,
+        total_nodes_count: int,
+        active_data_nodes: int,
+        master_eligible_nodes_count: int,
+        index_count: int,
+        shards_per_index: int,
+        index_roll_over_size_gb: int,
+        index_clean_up_age_days: int,
+        status: str = "green",
+        cpu_usage_percent: float = 0,
+        memory_usage_percent: float = 0,
+        disk_usage_percent: float = 0,
+        heap_usage_percent: float = 0,
+        total_shard_count: int = 0,
+        initializing_shards_count: int = 0,
+        relocating_shards_count: int = 0,
+        unassigned_shards_count: int = 0,
+        active_shards_count: int = 0,
+        active_primary_shards: int = 0,
     ):
         """
         Initialize the cluster object
@@ -43,7 +42,7 @@ class Cluster:
         :param cluster_ip_address: ip address of the cluster
         :param node_machine_type_identifier: type of machine on which elastic search is deployed
         :param total_nodes_count: total number of nodes of the cluster
-        :param data_nodes_count: total number of data nodes of the cluster
+        :param active_data_nodes: total number of data nodes of the cluster
         :param master_eligible_nodes_count: total number of master eligible nodes of the cluster
         :param index_count: total number of indexes in the cluster
         :param shards_per_index: maximum number of shards per index
@@ -60,7 +59,7 @@ class Cluster:
         :param unassigned_shards_count: total number of shards in unassigned state
         :param active_shards_count: total number of shards in active state
         :param active_primary_shards: total number of primary shards in active state
-        
+
         """
         self.node_machine_type_identifier = node_machine_type_identifier
         self.name = cluster_name
@@ -72,7 +71,6 @@ class Cluster:
         self.disk_usage_percent = disk_usage_percent
         self.heap_usage_percent = heap_usage_percent
         self.total_nodes_count = total_nodes_count
-        self.data_nodes_count = data_nodes_count
         self.master_eligible_nodes_count = master_eligible_nodes_count
         self.index_count = index_count
         self.index_roll_over_size_gb = index_roll_over_size_gb
@@ -86,7 +84,7 @@ class Cluster:
         self.date_time = datetime.now()
         self._ingestion_rate = 0
         self.active_primary_shards = active_primary_shards
-        self.data_nodes_count = data_nodes_count
+        self.active_data_nodes = active_data_nodes
 
     # TODO: Define methods for controlling cluster behaviour,
     #  node addition, removal etc

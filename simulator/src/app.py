@@ -264,7 +264,6 @@ if __name__ == "__main__":
         task = DataModel(
             cpu_usage_percent=cluster_obj.cpu_usage_percent,
             memory_usage_percent=cluster_obj.memory_usage_percent,
-            total_nodes_count=cluster_obj.total_nodes_count,
             date_created=cluster_obj.date_time,
             status=cluster_obj.status,
             total_nodes_count=cluster_obj.total_nodes_count,
