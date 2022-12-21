@@ -8,8 +8,8 @@ SIMULATION_GRAPH_FILE_NAME = "simulation_diagram.png"
 DATA_INGESTION = "data_ingestion"
 DATA_INGESTION_STATES = "states"
 SEARCHES = "searches"
-DATA_GENERATION_INTERVAL_MINUTES = "data_generation_interval_minutes"
-DATA_INGESTION_RANDOMNESS_PERCENTAGE = "randomness_percentage"
+SIMULATION_FREQUENCY_MINUTES = "simulation_frequency_minutes"
+DATA_INGESTION_RANDOMNESS_PERCENTAGE = 'randomness_percentage'
 # Todo - Shrinidhi/Manoj add remaining keys from config yaml
 
 CLUSTER_STATE_GREEN = "green"
@@ -24,12 +24,13 @@ HIGH_INGESTION_RATE_GB_PER_HOUR = 60
 CLUSTER_STATE = "status"
 CPU_USAGE_PERCENT = "cpu_usage_percent"
 MEMORY_USAGE_PERCENT = "memory_usage_percent"
+TOTAL_NODES_COUNT = 'total_nodes_count'
 STAT_REQUEST = {
     "cpu": CPU_USAGE_PERCENT,
     "mem": MEMORY_USAGE_PERCENT,
     "status": CLUSTER_STATE,
+    'nodes': TOTAL_NODES_COUNT,
 }
-
 
 CLUSTER_STATE = "status"
 TOTAL_NUM_NODES = "total_nodes_count"
@@ -53,3 +54,6 @@ STAT_REQUEST_CURRENT = {
 }
 
 APP_PORT = 5000
+
+PRIMARY_SHARDS_IN_ROLLOVER_INDEX = 1
+REPLICA_SHARDS_IN_ROLLOVER_INDEX = 1
