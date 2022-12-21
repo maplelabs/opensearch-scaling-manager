@@ -131,14 +131,19 @@ def current_all():
 # The endpoint returns request stat from the latest poll, returns error if sufficient data points are not present.
 @app.route('/stats/current/<string:stat_name>')
 def current(stat_name):
+    #Gets the datapoint till the current time
+    time_now = datetime.now()
+    duration = time_now.hour*60 + time_now.minute
+    time_obj = time_now - timedelta(minutes=duration)
     try:
         if constants.STAT_REQUEST[stat_name] == constants.CLUSTER_STATE:
             if Simulator.is_provision_in_progress():
                 return jsonify({"current": constants.CLUSTER_STATE_YELLOW})
         # Fetches the stat_name for the latest poll
-        current = DataModel.query.order_by(desc(DataModel.date_created)).with_entities(
+        current = DataModel.query.order_by(desc(DataModel.date_created)).filter(
+            DataModel.date_created > time_obj).filter(DataModel.date_created < time_now).with_entities(
             DataModel.__getattribute__(DataModel, constants.STAT_REQUEST[stat_name])).all()
-
+        
         # If expected data points count are not present then respond with error
         if len(current) == 0:
             return Response(json.dumps("Not enough Data points"), status=400)
