@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from flask import Flask, jsonify, Response, request
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text, desc
+from werkzeug.exceptions import BadRequest
 
 import constants
 from config_parser import parse_config, get_source_code_dir
@@ -46,8 +47,9 @@ def convert_to_hh_mm(duration_in_m):
     return time_obj
 
 
-# Returns the violated count for a requested metric, threshold and duration, returns error if sufficient data points are not present.
-@app.route("/stats/violated/<string:stat_name>/<int:duration>/<float:threshold>")
+# Returns the violated count for a requested metric, threshold and duration,
+# returns error if sufficient data points are not present.
+@app.route('/stats/violated/<string:stat_name>/<int:duration>/<float:threshold>')
 def violated_count(stat_name, duration, threshold):
     # calculate time to query for data
     time_now = datetime.now()
@@ -167,8 +169,8 @@ def current(stat_name):
         if constants.STAT_REQUEST[stat_name] == constants.CLUSTER_STATE:
             if Simulator.is_provision_in_progress():
                 return jsonify({"current": constants.CLUSTER_STATE_YELLOW})
-        """ Fetches the stat_name for the latest poll """
-        current = (
+        # Fetches the stat_name for the latest poll
+        current_stat = (
             DataModel.query.order_by(desc(DataModel.date_created))
             .filter(DataModel.date_created > time_obj)
             .filter(DataModel.date_created < time_now)
@@ -178,14 +180,16 @@ def current(stat_name):
             .all()
         )
 
-        """ If expected data points count are not present then respond with error """
-        if len(current) == 0:
+        # If expected data points count are not present then respond with error
+        if len(current_stat) == 0:
             return Response(json.dumps("Not enough Data points"), status=400)
 
-        return jsonify({"current": current[0][constants.STAT_REQUEST[stat_name]]})
+        return jsonify({"current_stat": current_stat[0][constants.STAT_REQUEST[stat_name]]})
 
+    except KeyError:
+        return Response(f'stat not found - {stat_name}', status=404)
     except Exception as e:
-        return Response(str(e), status=404)
+        return Response(e, status=404)
 
 
 @app.route("/provision/addnode", methods=["POST"])
@@ -196,20 +200,44 @@ def add_node():
     :return: total number of resultant nodes and duration of cluster state as yellow
     """
     try:
-        request.json["nodes"]
-    except:
-        return Response(json.dumps("Not enough Data points"), status=404)
-    # Todo - Reflect node count in cluster
+        # get the number of added nodes from request body
+        nodes = int(request.json['nodes'])
+        sim = Simulator(configs.cluster, configs.data_function, configs.searches, configs.simulation_frequency_minutes)
+        sim.cluster.add_nodes(nodes)
+        cluster_objects = sim.run(24 * 60)
+
+        cluster_objects_post_change = []
+        now = datetime.now()
+        for cluster_obj in cluster_objects:
+            if cluster_obj.date_time >= now:
+                cluster_objects_post_change.append(cluster_obj)
+                task = DataModel(
+                    cpu_usage_percent=cluster_obj.cpu_usage_percent,
+                    memory_usage_percent=cluster_obj.memory_usage_percent,
+                    date_created=cluster_obj.date_time,
+                    total_nodes_count=cluster_obj.total_nodes_count,
+                    status=cluster_obj.status
+                )
+                db.session.merge(task)
+        db.session.commit()
+        plot_data_points(cluster_objects_post_change, skip_data_ingestion=True)
+    except BadRequest as err:
+        return Response(json.dumps("expected key 'nodes'"), status=404)
     expiry_time = Simulator.create_provisioning_lock()
-    return jsonify({"expiry": expiry_time})
+    return jsonify({
+        'expiry': expiry_time,
+        'nodes': sim.cluster.total_nodes_count
+    })
 
 
-@app.route("/all")
-def all():
-    task = DataModel.query.with_entities(
-        DataModel.cpu_usage_percent, DataModel.memory_usage_percent, DataModel.status
+@app.route('/all')
+def all_data():
+    count = DataModel.query.with_entities(
+        DataModel.cpu_usage_percent,
+        DataModel.memory_usage_percent,
+        DataModel.status
     ).count()
-    return jsonify(task)
+    return jsonify(count)
 
 
 if __name__ == "__main__":
@@ -217,35 +245,20 @@ if __name__ == "__main__":
 
     # remove any existing provision lock
     Simulator.remove_provisioning_lock()
-
-    configs = parse_config(
-        os.path.join(get_source_code_dir(), constants.CONFIG_FILE_PATH)
-    )
-    all_states = [
-        State(**state)
-        for state in configs.data_ingestion.get(constants.DATA_INGESTION_STATES)
-    ]
-    randomness_percentage = configs.data_ingestion.get(
-        constants.DATA_INGESTION_RANDOMNESS_PERCENTAGE
-    )
-
-    data_function = DataIngestion(all_states, randomness_percentage)
-
-    cluster = Cluster(**configs.stats)
-
-    sim = Simulator(
-        cluster,
-        data_function,
-        configs.searches,
-        configs.data_generation_interval_minutes,
-    )
+    # get configs from config yaml
+    configs = parse_config(os.path.join(get_source_code_dir(), constants.CONFIG_FILE_PATH))
+    # create the simulator object
+    sim = Simulator(configs.cluster, configs.data_function, configs.searches, configs.simulation_frequency_minutes)
     # generate the data points from simulator
     cluster_objects = sim.run(24 * 60)
+    # save the generated data points to png
     plot_data_points(cluster_objects)
+    # save data points inside db
     for cluster_obj in cluster_objects:
         task = DataModel(
             cpu_usage_percent=cluster_obj.cpu_usage_percent,
             memory_usage_percent=cluster_obj.memory_usage_percent,
+            total_nodes_count=cluster_obj.total_nodes_count,
             date_created=cluster_obj.date_time,
             status=cluster_obj.status,
             total_nodes_count=cluster_obj.total_nodes_count,
@@ -259,5 +272,6 @@ if __name__ == "__main__":
         )
         db.session.add(task)
     db.session.commit()
+
     # start serving the apis
     app.run(port=constants.APP_PORT, debug=True)
