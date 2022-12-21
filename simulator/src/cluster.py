@@ -31,8 +31,7 @@ class Cluster:
             relocating_shards_count: int = 0,
             unassigned_shards_count: int = 0,
             active_shards_count: int = 0,
-            active_primary_shards: int = 0,
-            active_data_nodes: int = 0
+            active_primary_shards: int = 0
     ):
         """
         Initialize the cluster object
@@ -57,6 +56,8 @@ class Cluster:
         :param relocating_shards_count: total number of shards in relocating state
         :param unassigned_shards_count: total number of shards in unassigned state
         :param active_shards_count: total number of shards in active state
+        :param active_primary_shards: total number of primary shards in active state
+        
         """
         self.node_machine_type_identifier = node_machine_type_identifier
         self.name = cluster_name
@@ -82,7 +83,7 @@ class Cluster:
         self.date_time = datetime.now()
         self._ingestion_rate = 0
         self.active_primary_shards = active_primary_shards
-        self.active_data_nodes = active_data_nodes
+        self.data_nodes_count = data_nodes_count
 
     # TODO: Define methods for controlling cluster behaviour,
     #  node addition, removal etc
