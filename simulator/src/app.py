@@ -131,8 +131,8 @@ def average(stat_name, duration):
 
 @app.route("/stats/current")
 def current_all():
-    """ The endpoint returns all the stats from the latest poll, 
-        Returns error if sufficient data points are not present."""
+    """The endpoint returns all the stats from the latest poll,
+    Returns error if sufficient data points are not present."""
     try:
         stat_dict = {}
         for key in constants.STAT_REQUEST_CURRENT:
@@ -154,8 +154,12 @@ def current_all():
 
 @app.route("/stats/current/<string:stat_name>")
 def current(stat_name):
-    """ The endpoint returns request stat from the latest poll, 
-        Returns error if sufficient data points are not present."""
+    """
+    The endpoint returns requested stat from the latest poll,
+    returns error if sufficient data points are not present.
+    :param stat_name: represents the stat that is being queried.
+    :return: average of the provided stat name for the decision period.
+    """
     time_now = datetime.now()
     duration = time_now.hour * 60 + time_now.minute
     time_obj = time_now - timedelta(minutes=duration)
