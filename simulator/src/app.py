@@ -40,34 +40,32 @@ class DataModel(db.Model):
     date_created = db.Column(db.DateTime, default=datetime.now(), primary_key=True)
 
 
-# Converts the duration in minutes to time object of "HH:MM" format
-def convert_to_hh_mm(duration_in_m):
-    time_h_m = "{:02d}:{:02d}".format(*divmod(duration_in_m, 60))
-    time_obj = datetime.strptime(time_h_m, "%H:%M")
-    return time_obj
-
-
-# Returns the violated count for a requested metric, threshold and duration,
-# returns error if sufficient data points are not present.
 @app.route('/stats/violated/<string:stat_name>/<int:duration>/<float:threshold>')
 def violated_count(stat_name, duration, threshold):
+    """
+    Endpoint fetches the violated count for a requested metric, threshold and duration,
+    :param stat_name: represents the stat that is being queried.
+    :param duration: represents the time period for fetaching the average
+    :param threshold: represents the limit considered for evaluating violated count
+    :return: count of stat exceeding the threshold for a given duration
+    """
     # calculate time to query for data
     time_now = datetime.now()
 
     # Convert the minutes to time object to compare and query for required data points
-    time_obj = time_now - timedelta(minutes=duration)
+    query_begin_time = time_now - timedelta(minutes=duration)
 
     try:
         # Fetching the count of data points for given duration.
         data_point_count = (
             DataModel.query.order_by(constants.STAT_REQUEST[stat_name])
-            .filter(DataModel.date_created > time_obj)
+            .filter(DataModel.date_created > query_begin_time)
             .filter(DataModel.date_created < time_now)
             .count()
         )
 
         # If expected data points are not present then respond with error
-        if duration // sim.frequency_minutes > data_point_count:
+        if first_data_point_time > query_begin_time:
             return Response(json.dumps("Not enough Data points"), status=400)
 
         # Fetches the count of stat_name that exceeds the threshold for given duration
@@ -77,7 +75,7 @@ def violated_count(stat_name, duration, threshold):
                 DataModel.__getattribute__(DataModel, constants.STAT_REQUEST[stat_name])
                 > threshold
             )
-            .filter(DataModel.date_created > time_obj)
+            .filter(DataModel.date_created > query_begin_time)
             .filter(DataModel.date_created < time_now)
             .count()
         )
@@ -88,21 +86,27 @@ def violated_count(stat_name, duration, threshold):
         return Response(e, status=404)
 
 
-# The endpoint returns average of requested stat for a duration, returns error if sufficient data points are not present
 @app.route("/stats/avg/<string:stat_name>/<int:duration>")
 def average(stat_name, duration):
+    """
+    The endpoint cevaluates average of requested stat for a duration
+    returns error if sufficient data points are not present.
+    :param stat_name: represents the stat that is being queried.
+    :param duration: represents the time period for fetaching the average
+    :return: average of the provided stat name for the decision period.
+    """
     # calculate time to query for data
     time_now = datetime.now()
 
     # Convert the minutes to time object to compare and query for required data points
-    time_obj = time_now - timedelta(minutes=duration)
+    query_begin_time = time_now - timedelta(minutes=duration)
 
     stat_list = []
     try:
         # Fetches list of rows that is filter by stat_name and are filterd by decision period
         avg_list = (
             DataModel.query.order_by(constants.STAT_REQUEST[stat_name])
-            .filter(DataModel.date_created > time_obj)
+            .filter(DataModel.date_created > query_begin_time)
             .filter(DataModel.date_created < time_now)
             .with_entities(text(constants.STAT_REQUEST[stat_name]))
             .all()
@@ -111,7 +115,7 @@ def average(stat_name, duration):
             stat_list.append(avg_value[0])
 
         # If expected data points count are not present then respond with error
-        if duration // sim.frequency_minutes > len(stat_list):
+        if first_data_point_time > query_begin_time:
             return Response(json.dumps("Not enough Data points"), status=400)
 
         # check if any data points were collected
@@ -251,7 +255,9 @@ if __name__ == "__main__":
     sim = Simulator(configs.cluster, configs.data_function, configs.searches, configs.simulation_frequency_minutes)
     # generate the data points from simulator
     cluster_objects = sim.run(24 * 60)
-    # save the generated data points to png
+
+    first_data_point_time = cluster_objects[0].date_time
+
     plot_data_points(cluster_objects)
     # save data points inside db
     for cluster_obj in cluster_objects:
