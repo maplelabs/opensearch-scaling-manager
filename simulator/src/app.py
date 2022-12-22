@@ -50,7 +50,7 @@ def violated_count(stat_name, duration, threshold):
     """
     Endpoint fetches the violated count for a requested metric, threshold and duration,
     :param stat_name: represents the stat that is being queried.
-    :param duration: represents the time period for fetaching the average
+    :param duration: represents the time period for fetching the average
     :param threshold: represents the limit considered for evaluating violated count
     :return: count of stat exceeding the threshold for a given duration
     """
@@ -94,10 +94,10 @@ def violated_count(stat_name, duration, threshold):
 @app.route("/stats/avg/<string:stat_name>/<int:duration>")
 def average(stat_name, duration):
     """
-    The endpoint cevaluates average of requested stat for a duration
+    The endpoint evaluates average of requested stat for a duration
     returns error if sufficient data points are not present.
     :param stat_name: represents the stat that is being queried.
-    :param duration: represents the time period for fetaching the average
+    :param duration: represents the time period for fetching the average
     :return: average of the provided stat name for the decision period.
     """
     # calculate time to query for data
