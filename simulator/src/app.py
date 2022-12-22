@@ -164,7 +164,7 @@ def current(stat_name):
         if len(current_stat) == 0:
             return Response(json.dumps("Not enough Data points"), status=400)
 
-        return jsonify({"current_stat": current_stat[0][constants.STAT_REQUEST[stat_name]]})
+        return jsonify({"current": current_stat[0][constants.STAT_REQUEST[stat_name]]})
 
     except KeyError:
         return Response(f'stat not found - {stat_name}', status=404)
