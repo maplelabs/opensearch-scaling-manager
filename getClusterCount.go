@@ -115,14 +115,14 @@ func main(){
 	}
 	fmt.Println("Response: ", res)
 
-	someStruct:=GetClusterCount("RamUtil",300,20,ctx,esClient)
-	 b, err := json.MarshalIndent(someStruct,"","\t")
+	responeStruct:=GetClusterCount("RamUtil",300,20,ctx,esClient)
+	responseJson, err := json.MarshalIndent(responeStruct,"","\t")
    	 if err != nil {
         	fmt.Printf("Error: %s", err)
        		 return;
    	 }
 	fmt.Println()
-        fmt.Println(string(b))
+        fmt.Println(string(responseJson))
 	fmt.Println()
-	fmt.Println("Success!... ",someStruct)
+	fmt.Println("Response Structure: ",responeStruct)
 }

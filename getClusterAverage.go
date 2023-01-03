@@ -104,15 +104,15 @@ func main(){
 	}
 	fmt.Println("Response: ", res)
 
-	someStruct:=GetClusterAvg("RamUtil",300,ctx,esClient)
-	fmt.Println("Success!... ",someStruct)
-	 b, err := json.MarshalIndent(someStruct,"","\t")
+	responeStruct:=GetClusterAvg("RamUtil",300,ctx,esClient)
+	fmt.Println("Response Structure: ",responeStruct)
+	 responseJson, err := json.MarshalIndent(responeStruct,"","\t")
     	if err != nil {
         	fmt.Printf("Error: %s", err)
         	return;
    	 }
 	 fmt.Println()
 	 fmt.Println()
-   	 fmt.Println(string(b))
+   	 fmt.Println(string(responseJson))
 
 }

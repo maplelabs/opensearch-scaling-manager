@@ -225,16 +225,16 @@ func main(){
 	}
 	fmt.Println("Response: ", res)
 
-	someStruct:=GetClusterCurrent(ctx,esClient)
-	fmt.Println("Success!... ",someStruct)
+	responeStruct:=GetClusterCurrent(ctx,esClient)
+	fmt.Println("Response Structure: ",responeStruct)
 
-	b, err := json.MarshalIndent(someStruct,"","\t")
+	responseJson, err := json.MarshalIndent(responeStruct,"","\t")
          if err != nil {
                 fmt.Printf("Error: %s", err)
                  return;
          }
         fmt.Println()
-        fmt.Println(string(b))
+        fmt.Println(string(responseJson))
         fmt.Println()
 
 }
