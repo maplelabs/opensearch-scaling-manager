@@ -1,0 +1,17 @@
+ INFO         logger 2023/01/03 16:59:05 cluster_level_parameters.go:33: Main module initialized
+ INFO         logger 2023/01/03 16:59:05 task_definition_parameters.go:27: Main module initialized
+ INFO         logger 2023/01/03 16:59:05 config.go:27: Main module initialized
+ INFO         logger 2023/01/03 16:59:05 provision.go:53: Provisioner module initiated
+FATAL         logger 2023/01/03 16:59:14 state_functions.go:79: Index exists check failed:  dial tcp [::1]:9200: connectex: No connection could be made because the target machine actively refused it.
+ INFO         logger 2023/01/03 16:59:14 state_functions.go:81: Index already exists
+ERROR         logger 2023/01/03 16:59:23 state_functions.go:85: Create Index request error:  dial tcp [::1]:9200: connectex: No connection could be made because the target machine actively refused it.
+ERROR         logger 2023/01/03 16:59:23 state_functions.go:87: Index create Response:  [0 <nil>]
+ INFO         logger 2023/01/03 16:59:23 main.go:21: Main module initialized
+ INFO         logger 2023/01/03 16:59:34 task_definition_parameters.go:275: The scale_up_by_1 task is recommended and will be pushed to the queue
+ WARN         logger 2023/01/03 16:59:34 task_definition_parameters.go:94: The scale_down_by_1 task is not recommended as rules are not satisfied
+FATAL         logger 2023/01/03 16:59:43 state_functions.go:110: failed to search document:  dial tcp [::1]:9200: connectex: No connection could be made because the target machine actively refused it.
+ INFO         logger 2023/01/03 17:04:09 cluster_level_parameters.go:33: Main module initialized
+ INFO         logger 2023/01/03 17:04:09 task_definition_parameters.go:27: Main module initialized
+ INFO         logger 2023/01/03 17:04:09 config.go:27: Main module initialized
+ INFO         logger 2023/01/03 17:04:09 provision.go:53: Provisioner module initiated
+FATAL         logger 2023/01/03 17:04:18 state_functions.go:57: Unable to ping OpenSearch:  dial tcp [::1]:9200: connectex: No connection could be made because the target machine actively refused it.
