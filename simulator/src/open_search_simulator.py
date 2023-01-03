@@ -120,9 +120,6 @@ class Simulator:
             self.cluster.date_time = date_time
             resultant_cluster_objects.append(copy.deepcopy(self.cluster))
             self.elapsed_time_minutes += self.frequency_minutes
-        print([i.heap_usage_percent for i in resultant_cluster_objects])
-        print([i.memory_usage_percent for i in resultant_cluster_objects])
-        print([i.cpu_usage_percent for i in resultant_cluster_objects])
         return resultant_cluster_objects
 
     @staticmethod
