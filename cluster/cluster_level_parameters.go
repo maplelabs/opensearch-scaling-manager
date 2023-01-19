@@ -191,7 +191,7 @@ func getClusterAvgQuery(metricName string, decisionPeriod int) string {
 	return clusterAvgQueryString
 }
 
-func GetClusterAvg(metricName string, decisionPeriod int, ctx context.Context, esClient *opensearch.Client) (MetricStats, []byte) {
+func GetClusterAvg(metricName string, decisionPeriod int, ctx context.Context, osClient *opensearch.Client) (MetricStats, []byte) {
 	//Create an object of MetricStatsCluster to populate and return
 	var metricStats MetricStats
 
@@ -204,7 +204,7 @@ func GetClusterAvg(metricName string, decisionPeriod int, ctx context.Context, e
 	searchQuery, err := esapi.SearchRequest{
 		Index: indexName,
 		Body:  bytes.NewReader(jsonQuery),
-	}.Do(ctx, esClient)
+	}.Do(ctx, osClient)
 	if err != nil {
 		fmt.Println("Cannot fetch cluster average: ", err)
 		return metricStats, []byte(err.Error())
@@ -281,7 +281,7 @@ func getClusterCountQuery(metricName string, decisionPeriod int, limit float32) 
 	return clusterCountQueryString
 }
 
-func GetClusterCount(metricName string, decisionPeriod int, limit float32, ctx context.Context, esClient *opensearch.Client) (MetricViolatedCount, []byte) {
+func GetClusterCount(metricName string, decisionPeriod int, limit float32, ctx context.Context, osClient *opensearch.Client) (MetricViolatedCount, []byte) {
 	var metricViolatedCount MetricViolatedCount
 
 	//Get the query and convert to json
@@ -293,7 +293,7 @@ func GetClusterCount(metricName string, decisionPeriod int, limit float32, ctx c
 	searchQuery, err := esapi.SearchRequest{
 		Index: indexName,
 		Body:  bytes.NewReader(jsonQuery),
-	}.Do(ctx, esClient)
+	}.Do(ctx, osClient)
 	if err != nil {
 		fmt.Println("Cannot fetch cluster average: ", err)
 		return metricViolatedCount, []byte(err.Error())
@@ -362,7 +362,7 @@ func GetClusterCount(metricName string, decisionPeriod int, limit float32, ctx c
 // Return:
 //		Return populated ClusterDynamic struct.
 
-func GetClusterCurrent(ctx context.Context, esClient *opensearch.Client) ClusterDynamic {
+func GetClusterCurrent(ctx context.Context, osClient *opensearch.Client) ClusterDynamic {
 	var clusterCurrent ClusterDynamic
 
 	//execute the query and get the cluster level info for recent poll
@@ -376,7 +376,7 @@ func GetClusterCurrent(ctx context.Context, esClient *opensearch.Client) Cluster
 	clusterSearchQuery, err := esapi.SearchRequest{
 		Index: indexName,
 		Body:  bytes.NewReader(clusterJsonQuery),
-	}.Do(ctx, esClient)
+	}.Do(ctx, osClient)
 	if err != nil {
 		fmt.Println("Cannot fetch cluster average: ", err)
 		return clusterCurrent
