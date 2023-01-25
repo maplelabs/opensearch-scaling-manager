@@ -11,6 +11,8 @@ import (
 	utils "scaling_manager/utilities"
 	"strings"
 	"time"
+
+	"github.com/fsnotify/fsnotify"
 )
 
 var state = new(provision.State)
@@ -24,11 +26,13 @@ func init() {
 	log.Info.Println("Main module initialized")
 
 	firstExecution = true
-	configStruct, err := config.GetConfig("config.yaml")
+
+	configStruct, err := config.GetConfig("config.yaml", firstExecution, false)
 	if err != nil {
 		log.Panic.Println("The recommendation can not be made as there is an error in the validation of config file.", err)
 		panic(err)
 	}
+
 	cfg := configStruct.ClusterDetails
 	osutils.InitializeOsClient(cfg.OsCredentials.OsAdminUsername, cfg.OsCredentials.OsAdminPassword)
 
@@ -42,11 +46,13 @@ func init() {
 }
 
 func main() {
-	configStruct, err := config.GetConfig("config.yaml")
+	updatedCredsArray := make([]string, 4)
+
+	configStruct, updatedCredsArray, err := config.UpdateEncryptedCred("config.yaml", firstExecution, updatedCredsArray)
 	if err != nil {
-		log.Panic.Println("The recommendation can not be made as there is an error in the validation of config file.", err)
 		panic(err)
 	}
+	go fileWatch("config.yaml", updatedCredsArray)
 	// A periodic check if there is a change in master node to pick up incomplete provisioning
 	go periodicProvisionCheck(configStruct.UserConfig.PollingInterval)
 	ticker := time.Tick(time.Duration(configStruct.UserConfig.PollingInterval) * time.Second)
@@ -58,7 +64,7 @@ func main() {
 			firstExecution = false
 			// This function will be responsible for parsing the config file and fill in task_details struct.
 			var task = new(recommendation.TaskDetails)
-			configStruct, err := config.GetConfig("config.yaml")
+			configStruct, err := config.GetConfig("config.yaml", false, false)
 			if err != nil {
 				log.Error.Println("The recommendation can not be made as there is an error in the validation of config file.")
 				log.Error.Println(err.Error())
@@ -90,7 +96,7 @@ func periodicProvisionCheck(pollingInterval int) {
 			if (!previousMaster && currentMaster) || (currentMaster && firstExecution) {
 				//                      if firstExecution {
 				firstExecution = false
-				configStruct, err := config.GetConfig("config.yaml")
+				configStruct, err := config.GetConfig("config.yaml", false, false)
 				if err != nil {
 					log.Warn.Println("Unable to get Config from GetConfig()", err)
 					return
@@ -119,4 +125,44 @@ func periodicProvisionCheck(pollingInterval int) {
 		// Update the previousMaster for next loop
 		previousMaster = currentMaster
 	}
+}
+
+func fileWatch(filePath string, updatedCredsArray []string) {
+	//Adding file watcher to detect the change in configuration
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		log.Error.Println("Error while creating new fileWatcher : ", err)
+	}
+	defer watcher.Close()
+	done := make(chan bool)
+
+	//A go routine that keeps checking for change in configuration
+	go func() {
+		for {
+			select {
+			// watch for events
+			case event := <-watcher.Events:
+				//If there is change in config then clear recommendation queue
+				//clearRecommendationQueue()
+				log.Info.Println("EVENT! ", event)
+				time.Sleep(2 * time.Second)
+				//fmt.Println("The recommendation queue will be cleared.")
+				_, updatedArray, updateErr := config.UpdateEncryptedCred("config.yaml", false, updatedCredsArray)
+				if updateErr != nil {
+					log.Panic.Println("ConfigStruct encryption failed : ", updateErr)
+				} else {
+					updatedCredsArray = updatedArray
+				}
+			case err := <-watcher.Errors:
+				log.Info.Println("Error in fileWatcher: ", err)
+			}
+		}
+	}()
+
+	// Adding fsnotify watcher to keep track of the changes in config file
+	if err := watcher.Add(filePath); err != nil {
+		log.Error.Println("Error while adding the config file changes to the fileWatcher :", err)
+	}
+
+	<-done
 }
