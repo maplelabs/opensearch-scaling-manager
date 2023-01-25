@@ -4,21 +4,75 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/base64"
+	mrand "math/rand"
+	"os"
 	"scaling_manager/logger"
+	"time"
 )
 
 var log = new(logger.LOG)
+var EncryptionSecret string
+var seed = time.Now().Unix()
 
 // Initializing logger module
 func init() {
 	log.Init("logger")
-	log.Info.Println("FetchMetrics module initiated")
+	log.Info.Println("Crypto module initiated")
+	mrand.Seed(seed)
+	err := CheckAndUpdateSecretFile("secret.txt")
+	if err != nil {
+		panic(err)
+	}
+
 }
 
 var bytes = []byte{35, 46, 57, 24, 85, 35, 24, 74, 87, 35, 88, 98, 66, 32, 14, 05}
 
-// This should be in an env file in production
-const EncryptionSecret string = "encryptionsecret"
+func GeneratePassword() string {
+	mrand.Seed(time.Now().UnixNano())
+	digits := "0123456789"
+	specials := "*@#$"
+	all := "ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
+		"abcdefghijklmnopqrstuvwxyz" +
+		digits + specials
+	length := 16
+	buf := make([]byte, length)
+	buf[0] = digits[mrand.Intn(len(digits))]
+	buf[1] = specials[mrand.Intn(len(specials))]
+	for i := 2; i < length; i++ {
+		buf[i] = all[mrand.Intn(len(all))]
+	}
+	mrand.Shuffle(len(buf), func(i, j int) {
+		buf[i], buf[j] = buf[j], buf[i]
+	})
+	str := string(buf)
+	return str
+}
+
+func CheckAndUpdateSecretFile(secret_filepath string) error {
+	if _, err := os.Stat(secret_filepath); err == nil {
+		data, err := os.ReadFile(secret_filepath)
+		if err != nil {
+			log.Panic.Println("Error reading the secret file")
+			return err
+		}
+		EncryptionSecret = string(data)
+	} else {
+		EncryptionSecret = GeneratePassword()
+		f, err := os.Create(secret_filepath)
+		if err != nil {
+			log.Panic.Println("Error while creating secret file : ", err)
+			return err
+		}
+		defer f.Close()
+		_, err = f.WriteString(EncryptionSecret)
+		if err != nil {
+			log.Panic.Println("Error while creating secret file : ", err)
+			return err
+		}
+	}
+	return nil
+}
 
 func Encode(b []byte) string {
 	return base64.StdEncoding.EncodeToString(b)
