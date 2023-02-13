@@ -111,9 +111,8 @@ Specify data ingestion with respect to time of the day to represent pattern for 
 
 
 ### Sample cofig.yaml
-  
-  https://maplelabsblr-my.sharepoint.com/:u:/g/personal/manojkumar_chandru_maplelabs_com/EeQ3rf4JQeJPmtdiiQEyh84BwcyaDHP1odrClXeLn7IFhw?e=Cs21xi
 
+https://maplelabsblr-my.sharepoint.com/:u:/g/personal/manojkumar_chandru_maplelabs_com/EQPZRuAbifdLroP1VHH8HMYBv4RyCaBgsMqsccdPFNSzOw?e=kYqzXb
 
 
 
@@ -179,8 +178,6 @@ Simulator provide the following APIs to interact with it
 
 ## Scaling Manager Configuration
 
-------
-
 The user can specify some key features of an OpenSearch Cluster for simulator through the config file provided. The functionalities supported are:
 
 **user_config:**
@@ -201,15 +198,13 @@ The user can specify some key features of an OpenSearch Cluster for simulator th
 
 ​	**os_credentials:** 
 
- 		**os_admin_username:** Username for the OpenSearch for connecting. This can be set to empty if the security is disable in OpenSearch.
+​		**os_admin_username:** Username for the OpenSearch for connecting. This can be set to empty if the security is disable in OpenSearch.
 
- 		**os_admin_password:** Password for the OpenSearch for connecting. This can be set to empty if the security is disable in OpenSearch.
-
- 	**cloud_type:** Type of cloud used in cluster
+​		**os_admin_password:** Password for the OpenSearch for connecting. This can be set to empty if the security is disable in OpenSearch.
 
 ​	 **cloud_credentials:**
 
-​		 **secret_key:** Secret key for cluster
+​		**secret_key:** Secret key for cluster
 
 ​		**access_key:** Access key for cluster
 
@@ -221,7 +216,7 @@ The user can specify some key features of an OpenSearch Cluster for simulator th
 
 ​	 **disk_per_node_in_gb:** Size of DISK used per node (GB)
 
- 	**number_max_nodes_allowed:** Maximum number of nodes allowed for the cluster
+**number_max_nodes_allowed:** Maximum number of nodes allowed for the cluster
 
 **task_details:** Field that contains details on what task should be performed i.e scale_up_by_1 or scale_down_by_1
 
@@ -238,7 +233,48 @@ The user can specify some key features of an OpenSearch Cluster for simulator th
 
 ### Sample config.yaml
 
-  https://maplelabsblr-my.sharepoint.com/:u:/g/personal/manojkumar_chandru_maplelabs_com/EaTGPNuOhxZJtl1UEFoFWDMBsXQbYggiSouNRKhvGROSrA?e=BbNf4X
+https://maplelabsblr-my.sharepoint.com/:u:/g/personal/manojkumar_chandru_maplelabs_com/ET7yN3tdkHpNi5VjWOjPxd0BvaQ99auatK82GOhC2-ejIA?e=TGy93z
+
+
+
+### Working Principle of Scaling Manager
+
+------
+
+Scaling manager has following modules
+
+- Fetch Metrics
+- Recommendation
+- Trigger
+- Provision
+- State
+
+**Fetch Metrics:** Collects the metrics of the cluster where the code is deployed and those metrics are indexed into Elasticsearch 
+
+**Recommendation:** Based on the config file of the Scaling Manager it evaluates the rules against the merics that are fetched in Fetch Metrics and recommends the task (scale_up_by_1 or scale_down_by_1 )
+
+**Trigger:** Checks the cluster state if the state is normal gives command to provision module, update state=provisioning and logs "provision triggered - Up/Down Number of Nodes". If cluster state is not normal it clears the command queue, commands are ignored since the cluster health criteria is not satisfied.
+
+**Provision:** Command of the state is received by provisioning and takes action based on provisioning command.
+
+- If provisioning completed successfully, update state = provision completed.
+- If provisioning failed, update state = provisioning failed.
+
+**State:** Checks the current state and status of cluster and update state.If state == provision completed
+
+- Check if all system metrics are in a normal state
+  - Cluster state is green
+  - No relocating shards
+- Update State = Normal
+
+
+
+### Scaling Manager Flow Diagram 
+
+------
+
+https://lucid.app/publicSegments/view/b8e022c2-8adf-4737-82d8-f3869d61a86a/image.png
+
 
 
 ### Build, Packaging and installation
