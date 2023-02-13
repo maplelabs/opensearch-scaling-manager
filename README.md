@@ -115,23 +115,6 @@ Specify data ingestion with respect to time of the day to represent pattern for 
   https://maplelabsblr-my.sharepoint.com/:u:/g/personal/manojkumar_chandru_maplelabs_com/EeQ3rf4JQeJPmtdiiQEyh84BwcyaDHP1odrClXeLn7IFhw?e=Cs21xi
 
 
-# Specify searches along with their type, probability and load inflected on the cluster.
-search_description:
-  simple:
-    cpu_load_percent: 0.001
-    memory_load_percent: 1
-    heap_load_percent: 0.01
-  medium:
-    cpu_load_percent: 0.0015
-    memory_load_percent: 1.5
-    heap_load_percent: 0.01
-  complex:
-    cpu_load_percent: 0.002
-    memory_load_percent: 2
-    heap_load_percent: 0.01
-
-```
-
 
 
 ### Simulator Behavior
