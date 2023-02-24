@@ -11,10 +11,12 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
+
 	"github.com/maplelabs/opensearch-scaling-manager/cluster"
 	"github.com/maplelabs/opensearch-scaling-manager/cluster_sim"
 	"github.com/maplelabs/opensearch-scaling-manager/logger"
-	"strings"
+	"github.com/maplelabs/opensearch-scaling-manager/provision"
 )
 
 var log logger.LOG
@@ -39,7 +41,7 @@ type Task struct {
 	// Rules indicates list of rules to evaluate the criteria for the recomm+endation engine.
 	Rules []Rule `yaml:"rules" validate:"gt=0,dive"`
 	// Operator indicates the logical operation needs to be performed while executing the rules
-	Operator string `yaml:"operator" validate:"required,oneof=AND OR"`
+	Operator string `yaml:"operator" validate:"required,oneof=AND OR EVENT"`
 }
 
 // This struct contains the rule.
@@ -64,6 +66,13 @@ type Rule struct {
 	// Occurrences indicate the number of time a rule reached the threshold limit for a give decision period.
 	// It will be applicable only when the Stat is set to Count.
 	Occurrences int `yaml:"occurrences" validate:"required_if=Stat COUNT"`
+	// Scheduling time indicates cron time expression to schedule scaling operations
+	// Example:
+	// SchedulingTime = "30 5 * * 1-5"
+	// In the above example the cron job will run at 5:30 AM from Mon-Fri of every month
+	SchedulingTime string `yaml:"scheduling_time" validate:"required if="`
+	// NumNodesRequired specifies the integer value of number of nodes to be present in cluster for event based scaling operations
+	NumNodesRequired int `yaml: "number_of_node" validate:""`
 }
 
 // This struct contains the task details which is set of actions.
@@ -92,10 +101,15 @@ type TaskDetails struct {
 // Return:
 //		([]map[string]string): Returns an array of the recommendations.
 
-func (t TaskDetails) EvaluateTask(pollingInterval int, simFlag, isAccelerated bool) []map[string]string {
+func (t TaskDetails) EvaluateTask(pollingInterval int, simFlag, isAccelerated bool) ([]map[string]string, []Task ){
 	var recommendationArray []map[string]string
 	var isRecommendedTask bool
+	var cronJobList []Task
 	for _, v := range t.Tasks {
+		if v.Operator == "EVENT"{
+			cronJobList = append(cronJobList, v)
+			continue
+		}
 		var rulesResponsibleMap = make(map[string]string)
 		isRecommendedTask, rulesResponsibleMap[v.TaskName] = v.GetNextTask(pollingInterval, simFlag, isAccelerated)
 		log.Debug.Println(rulesResponsibleMap)
@@ -106,7 +120,7 @@ func (t TaskDetails) EvaluateTask(pollingInterval int, simFlag, isAccelerated bo
 			log.Debug.Println(fmt.Sprintf("The %s task is not recommended as rules are not satisfied", v.TaskName))
 		}
 	}
-	return recommendationArray
+	return recommendationArray, cronJobList
 }
 
 // Inputs:

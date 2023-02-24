@@ -14,6 +14,7 @@ import (
 	"github.com/maplelabs/opensearch-scaling-manager/recommendation"
 	utils "github.com/maplelabs/opensearch-scaling-manager/utilities"
 
+	cron "github.com/robfig/cron/v3"
 	"github.com/tkuchiki/faketime"
 )
 
@@ -25,6 +26,9 @@ var log logger.LOG
 
 // A global variable which lets the provision continue from where it left off if there was an abrupt stop and restart of application.
 var firstExecution bool
+
+// A global variable to keep track of cronJob details
+var cronJob = cron.New()
 
 // Input:
 //
@@ -109,7 +113,10 @@ func Run() {
 			task.Tasks = configStruct.TaskDetails
 			userCfg := configStruct.UserConfig
 			clusterCfg := configStruct.ClusterDetails
-			recommendationList := task.EvaluateTask(userCfg.PollingInterval, userCfg.MonitorWithSimulator, userCfg.IsAccelerated)
+			recommendationList, cronJobList := task.EvaluateTask(userCfg.PollingInterval, userCfg.MonitorWithSimulator, userCfg.IsAccelerated)
+			if len(cronJobList) > 0 {
+				CreateCronJob(cronJobList, state, clusterCfg, userCfg, t)
+			}
 			provision.GetRecommendation(state, recommendationList, clusterCfg, userCfg, t)
 			if configStruct.UserConfig.MonitorWithSimulator && configStruct.UserConfig.IsAccelerated {
 				*t = t.Add(time.Minute * 5)
@@ -173,6 +180,33 @@ func periodicProvisionCheck(pollingInterval int, t *time.Time) {
 		// Update the previousMaster for next loop
 		previousMaster = currentMaster
 	}
+}
+
+// Input:
+//
+//	cronTasks ([]]recommendation.Task): List of tasks to be added to Cron Job
+// 	state (*provision.State): A pointer to the state struct which is state maintained in OS document
+//	clusterCfg (config.ClusterDetails): Cluster Level config details
+//	usrCfg (config.UserConfig): User defined config for application behavior
+// 
+// Description:
+// 
+//	At each polling interval creates the cron jobs based on the config file. It removes the Cron Jobs that were 
+//  added in previous polling interval and creates required jobs. It will use the list of tasks (cronTasks) to 
+// 	schedule and create cron job.
+// 	
+// Return:
+func CreateCronJob(cronTasks []recommendation.Task, state *provision.State, clusterCfg config.ClusterDetails, userCfg config.UserConfig, t *time.Time) {
+	for _, jobs := range cronJob.Entries() {
+		cronJob.Remove(jobs.ID)
+	}
+
+	for _, cronTask := range cronTasks {
+		for _, rules := range cronTask.Rules {
+			cronJob.AddFunc(rules.SchedulingTime, provision.TriggerCron(rules.NumNodesRequired, cronTask.TaskName, state, clusterCfg, userCfg, rules.SchedulingTime, t))
+		}
+	}
+	cronJob.Start()
 }
 
 // Input:
