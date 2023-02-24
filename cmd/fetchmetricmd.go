@@ -42,7 +42,7 @@ func init() {
 //
 //	(error): Returns error upon unsuccessful execution
 func fetchMetricstart() {
-	configStruct, err := config.GetConfig("config.yaml")
+	configStruct, err := config.GetConfig()
 	if err != nil {
 		log.Panic.Println("The recommendation can not be made as there is an error in the validation of config file.", err)
 		panic(err)
