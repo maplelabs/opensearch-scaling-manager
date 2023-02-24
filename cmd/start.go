@@ -2,10 +2,12 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/spf13/cobra"
 	"os"
 	"os/exec"
 
+	"github.com/spf13/cobra"
+
+	crypto "github.com/maplelabs/opensearch-scaling-manager/crypto"
 	"github.com/maplelabs/opensearch-scaling-manager/logger"
 	app "github.com/maplelabs/opensearch-scaling-manager/scaleManager"
 )
@@ -43,7 +45,8 @@ var startCmd = &cobra.Command{
 // Input:
 //
 // Description:
-// 	Initializes the start command, adds the required flags
+//
+//	Initializes the start command, adds the required flags
 //
 // Return:
 func init() {
@@ -55,12 +58,13 @@ func init() {
 //
 // Description:
 //
-// 	The Function initilazes and starts the execution of Scaling Manager
+//	The Function initilazes and starts the execution of Scaling Manager
 //
 // Return:
 //
-// 	(error): Returns error upon unsuccessful execution
+//	(error): Returns error upon unsuccessful execution
 func start() error {
+	crypto.Initialize("main")
 	app.Initialize()
 	app.Run()
 	return nil
@@ -70,13 +74,13 @@ func start() error {
 //
 // Description:
 //
-// 	The Function is executed when user sets flag(--b=true) along
-// 	with start command. It creates a Background process and creates
-// 	a file to track the Process Id of the background process.
+//	The Function is executed when user sets flag(--b=true) along
+//	with start command. It creates a Background process and creates
+//	a file to track the Process Id of the background process.
 //
 // Return:
 //
-// 	(error): Returns error upon unsuccessful execution.
+//	(error): Returns error upon unsuccessful execution.
 func startBackground() error {
 	_, err := os.Stat(PidFilePath + "/pidFile")
 

@@ -1,14 +1,9 @@
 package cmd
 
 import (
-	"os"
-
+	crypto "github.com/maplelabs/opensearch-scaling-manager/crypto"
+	app "github.com/maplelabs/opensearch-scaling-manager/scaleManager"
 	"github.com/spf13/cobra"
-
-	"github.com/maplelabs/opensearch-scaling-manager/config"
-	fetch "github.com/maplelabs/opensearch-scaling-manager/fetchmetrics"
-	osutils "github.com/maplelabs/opensearch-scaling-manager/opensearchUtils"
-	"github.com/maplelabs/opensearch-scaling-manager/provision"
 )
 
 // Start Command to start the Scaling Manager service
@@ -42,23 +37,7 @@ func init() {
 //
 //	(error): Returns error upon unsuccessful execution
 func fetchMetricstart() {
-	configStruct, err := config.GetConfig()
-	if err != nil {
-		log.Panic.Println("The recommendation can not be made as there is an error in the validation of config file.", err)
-		panic(err)
-	}
-	cfg := configStruct.ClusterDetails
-
-	osutils.InitializeOsClient(cfg.OsCredentials.OsAdminUsername, cfg.OsCredentials.OsAdminPassword)
-
-	provision.InitializeDocId()
-
-	userCfg := configStruct.UserConfig
-
-	if !userCfg.MonitorWithSimulator {
-		fetch.FetchMetrics(userCfg.PollingInterval, userCfg.PurgeAfter)
-	} else {
-		log.Warn.Println("MonitorWithSimulator is enabled. Please disable and re-run the fetch-metrics module.")
-		os.Exit(1)
-	}
+	crypto.Initialize("fetchMetrics")
+	app.Initialize()
+	app.StartFetchMetrics()
 }
