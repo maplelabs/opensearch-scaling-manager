@@ -7,13 +7,9 @@ import (
 
 	"github.com/maplelabs/opensearch-scaling-manager/config"
 	fetch "github.com/maplelabs/opensearch-scaling-manager/fetchmetrics"
-	"github.com/maplelabs/opensearch-scaling-manager/logger"
 	osutils "github.com/maplelabs/opensearch-scaling-manager/opensearchUtils"
 	"github.com/maplelabs/opensearch-scaling-manager/provision"
 )
-
-// Logger variable used across the package for logging.
-var log logger.LOG
 
 // Start Command to start the Scaling Manager service
 var fetchMetricStartCmd = &cobra.Command{
