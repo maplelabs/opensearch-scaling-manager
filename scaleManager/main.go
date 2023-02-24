@@ -229,6 +229,22 @@ func fileWatch(previousConfigStruct config.ConfigStruct) {
 	<-done
 }
 
+func StartFetchMetrics() {
+	configStruct, err := config.GetConfig()
+	if err != nil {
+		log.Error.Println("Error validating config file", err)
+		panic(err)
+	}
+	userCfg := configStruct.UserConfig
+
+	if !userCfg.MonitorWithSimulator {
+		fetch.FetchMetrics(userCfg.PollingInterval, userCfg.PurgeAfter)
+	} else {
+		log.Warn.Println("MonitorWithSimulator is enabled. Please disable and re-run the fetch-metrics module.")
+		os.Exit(1)
+	}
+}
+
 // Input:
 //
 // Description:
