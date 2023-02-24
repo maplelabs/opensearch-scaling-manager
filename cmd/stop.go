@@ -12,7 +12,8 @@ import (
 // Input:
 //
 // Description:
-// 	Initializes the stop command, adds the required flags
+//
+//	Initializes the stop command, adds the required flags
 //
 // Return:
 func init() {

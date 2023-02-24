@@ -1,14 +1,15 @@
 package config
 
 import (
+	"io/ioutil"
+	"os"
+	"regexp"
+
 	"github.com/go-playground/validator/v10"
 	"github.com/maplelabs/opensearch-scaling-manager/cluster"
 	"github.com/maplelabs/opensearch-scaling-manager/logger"
 	"github.com/maplelabs/opensearch-scaling-manager/recommendation"
 	"gopkg.in/yaml.v3"
-	"io/ioutil"
-	"os"
-	"regexp"
 )
 
 var log logger.LOG

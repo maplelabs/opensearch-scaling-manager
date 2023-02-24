@@ -5,15 +5,16 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/base32"
-	"github.com/maplelabs/opensearch-scaling-manager/config"
-	"github.com/maplelabs/opensearch-scaling-manager/logger"
-	osutils "github.com/maplelabs/opensearch-scaling-manager/opensearchUtils"
-	ansibleutils "github.com/maplelabs/opensearch-scaling-manager/ansible_scripts"
-	utils "github.com/maplelabs/opensearch-scaling-manager/utilities"
 	mrand "math/rand"
 	"os"
 	"strings"
 	"time"
+
+	ansibleutils "github.com/maplelabs/opensearch-scaling-manager/ansible_scripts"
+	"github.com/maplelabs/opensearch-scaling-manager/config"
+	"github.com/maplelabs/opensearch-scaling-manager/logger"
+	osutils "github.com/maplelabs/opensearch-scaling-manager/opensearchUtils"
+	utils "github.com/maplelabs/opensearch-scaling-manager/utilities"
 )
 
 var log = new(logger.LOG)

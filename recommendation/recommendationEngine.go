@@ -11,10 +11,11 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
+
 	"github.com/maplelabs/opensearch-scaling-manager/cluster"
 	"github.com/maplelabs/opensearch-scaling-manager/cluster_sim"
 	"github.com/maplelabs/opensearch-scaling-manager/logger"
-	"strings"
 )
 
 var log logger.LOG

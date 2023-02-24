@@ -3,15 +3,16 @@ package provision
 import (
 	"context"
 	"encoding/json"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/maplelabs/opensearch-scaling-manager/cluster"
 	"github.com/maplelabs/opensearch-scaling-manager/cluster_sim"
 	"github.com/maplelabs/opensearch-scaling-manager/config"
 	osutils "github.com/maplelabs/opensearch-scaling-manager/opensearchUtils"
 	utils "github.com/maplelabs/opensearch-scaling-manager/utilities"
-	"regexp"
-	"strconv"
-	"strings"
-	"time"
 )
 
 // Input:

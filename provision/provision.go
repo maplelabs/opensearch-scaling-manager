@@ -9,6 +9,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"os"
+	"strings"
+	"time"
+
 	ansibleutils "github.com/maplelabs/opensearch-scaling-manager/ansible_scripts"
 	"github.com/maplelabs/opensearch-scaling-manager/cluster"
 	"github.com/maplelabs/opensearch-scaling-manager/cluster_sim"
@@ -16,10 +21,6 @@ import (
 	"github.com/maplelabs/opensearch-scaling-manager/crypto"
 	osutils "github.com/maplelabs/opensearch-scaling-manager/opensearchUtils"
 	utils "github.com/maplelabs/opensearch-scaling-manager/utilities"
-	"net/http"
-	"os"
-	"strings"
-	"time"
 
 	"github.com/maplelabs/opensearch-scaling-manager/logger"
 

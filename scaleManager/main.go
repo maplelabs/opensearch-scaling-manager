@@ -8,7 +8,6 @@ import (
 
 	"github.com/maplelabs/opensearch-scaling-manager/config"
 	"github.com/maplelabs/opensearch-scaling-manager/crypto"
-	fetch "github.com/maplelabs/opensearch-scaling-manager/fetchmetrics"
 	"github.com/maplelabs/opensearch-scaling-manager/logger"
 	"github.com/maplelabs/opensearch-scaling-manager/provision"
 	"github.com/maplelabs/opensearch-scaling-manager/recommendation"
@@ -45,18 +44,12 @@ func Initialize() {
 
 	firstExecution = true
 
-	configStruct, err := config.GetConfig()
+	_, err := config.GetConfig()
 	if err != nil {
 		log.Panic.Println("The recommendation can not be made as there is an error in the validation of config file.", err)
 		panic(err)
 	}
 	provision.InitializeDocId()
-
-	userCfg := configStruct.UserConfig
-
-	if !userCfg.MonitorWithSimulator {
-		go fetch.FetchMetrics(userCfg.PollingInterval, userCfg.PurgeAfter)
-	}
 
 }
 
