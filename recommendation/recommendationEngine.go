@@ -16,7 +16,6 @@ import (
 	"github.com/maplelabs/opensearch-scaling-manager/cluster"
 	"github.com/maplelabs/opensearch-scaling-manager/cluster_sim"
 	"github.com/maplelabs/opensearch-scaling-manager/logger"
-	"github.com/maplelabs/opensearch-scaling-manager/provision"
 )
 
 var log logger.LOG
