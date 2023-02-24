@@ -7,16 +7,20 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
+	"time"
+
+	ansibleutils "github.com/maplelabs/opensearch-scaling-manager/ansible_scripts"
 	"github.com/maplelabs/opensearch-scaling-manager/cluster"
 	"github.com/maplelabs/opensearch-scaling-manager/cluster_sim"
 	"github.com/maplelabs/opensearch-scaling-manager/config"
+	"github.com/maplelabs/opensearch-scaling-manager/crypto"
 	osutils "github.com/maplelabs/opensearch-scaling-manager/opensearchUtils"
 	utils "github.com/maplelabs/opensearch-scaling-manager/utilities"
-	"strings"
-	"time"
 
 	"github.com/maplelabs/opensearch-scaling-manager/logger"
 
@@ -60,6 +64,8 @@ type State struct {
 	StatTag string
 	// For snappyflow dashboard
 	_documentType string
+	// Timestamp
+	Timestamp int64
 }
 
 // Input:
@@ -108,6 +114,7 @@ func TriggerProvision(clusterCfg config.ClusterDetails, usrCfg config.UserConfig
 			log.Info.Println("Scaleup successful")
 			PushToOs(state, "Success", err)
 		} else {
+			log.Error.Println(err)
 			state.GetCurrentState()
 			// Add a retry mechanism
 			state.PreviousState = state.CurrentState
@@ -130,6 +137,7 @@ func TriggerProvision(clusterCfg config.ClusterDetails, usrCfg config.UserConfig
 			log.Info.Println("Scaledown successful")
 			PushToOs(state, "Success", err)
 		} else {
+			log.Error.Println(err)
 			state.GetCurrentState()
 			// Add a retry mechanism
 			state.PreviousState = state.CurrentState
@@ -161,6 +169,8 @@ func ScaleOut(clusterCfg config.ClusterDetails, usrCfg config.UserConfig, state 
 	// Read the current state of scaleup process and proceed with next step
 	// If no stage was already set. The function returns an empty string. Then, start the scaleup process
 	state.GetCurrentState()
+	crypto.GetDecryptedCloudCreds(&clusterCfg.CloudCredentials)
+	crypto.GetDecryptedOsCreds(&clusterCfg.OsCredentials)
 	var newNodeIp string
 	simFlag := usrCfg.MonitorWithSimulator
 	monitorWithLogs := usrCfg.MonitorWithLogs
@@ -169,7 +179,6 @@ func ScaleOut(clusterCfg config.ClusterDetails, usrCfg config.UserConfig, state 
 	switch state.CurrentState {
 	case "provisioning_scaleup":
 		log.Info.Println("Starting scaleUp process")
-		time.Sleep(time.Duration(usrCfg.PollingInterval) * time.Second)
 		if simFlag && isAccelerated {
 			fakeSleep(t)
 		}
@@ -193,7 +202,7 @@ func ScaleOut(clusterCfg config.ClusterDetails, usrCfg config.UserConfig, state 
 			}
 		} else {
 			var err error
-			newNodeIp, err = SpinNewVm(clusterCfg.LaunchTemplateId, clusterCfg.LaunchTemplateVersion)
+			newNodeIp, err = SpinNewVm(clusterCfg.LaunchTemplateId, clusterCfg.LaunchTemplateVersion, clusterCfg.CloudCredentials)
 			if err != nil {
 				return false, err
 			}
@@ -218,13 +227,13 @@ func ScaleOut(clusterCfg config.ClusterDetails, usrCfg config.UserConfig, state 
 				fakeSleep(t)
 			}
 			log.Info.Println("Configuring in progress")
-			time.Sleep(time.Duration(usrCfg.PollingInterval) * time.Second)
 			if simFlag && isAccelerated {
 				fakeSleep(t)
 			}
 		} else {
+			log.Info.Println("Configuring Opensearch on new node...")
 			hostsFileName := "ansible_scripts/hosts"
-			username := "ubuntu"
+			username := clusterCfg.SshUser
 			f, err := os.OpenFile(hostsFileName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 			if err != nil {
 				log.Fatal.Println(err)
@@ -233,18 +242,66 @@ func ScaleOut(clusterCfg config.ClusterDetails, usrCfg config.UserConfig, state 
 			defer f.Close()
 			nodes := utils.GetNodes()
 			dataWriter := bufio.NewWriter(f)
-			dataWriter.WriteString("[current-nodes]\n")
+			dataWriter.WriteString("[current_nodes]\n")
 			for _, nodeIdMap := range nodes {
-				_, _ = dataWriter.WriteString(nodeIdMap.(map[string]interface{})["name"].(string) + " " + "ansible_user=" + username + " roles=master,data,ingest ansible_private_host=" + nodeIdMap.(map[string]interface{})["hostIp"].(string) + " ansible_ssh_private_key_file=./testing-scaling-manager.pem\n")
+				_, writeErr := dataWriter.WriteString(nodeIdMap.(map[string]string)["name"] + " ansible_user=" + username + " roles=master,data,ingest ansible_private_host=" + nodeIdMap.(map[string]string)["hostIp"] + " ansible_ssh_private_key_file=" + clusterCfg.CloudCredentials.PemFilePath + "\n")
+				if writeErr != nil {
+					log.Error.Println("Error writing the node data into hosts file", writeErr)
+				}
 			}
-			dataWriter.WriteString("[new-node]\n")
-			dataWriter.WriteString("new-node-" + fmt.Sprint(len(nodes)+1) + " ansible_user=" + username + " roles=master,data,ingest ansible_private_host=" + newNodeIp + " ansible_ssh_private_key_file=./testing-scaling-manager.pem\n")
+			dataWriter.WriteString("[new_node]\n")
+			dataWriter.WriteString("node-" + strings.ReplaceAll(newNodeIp, ".", "-") + " ansible_user=" + username + " roles=master,data,ingest ansible_private_host=" + newNodeIp + " ansible_ssh_private_key_file=" + clusterCfg.CloudCredentials.PemFilePath + "\n")
 			dataWriter.Flush()
-			ansibleErr := CallAnsible(username, hostsFileName, clusterCfg, "scale_up")
+			ansibleErr := ansibleutils.CallAnsible(username, hostsFileName, clusterCfg, "scale_up")
 			if ansibleErr != nil {
-				log.Fatal.Println(err)
+				if newNodeIp != "" {
+					log.Warn.Println("Terminating the instance as the ansible script failed.")
+					terminateErr := TerminateInstance(newNodeIp, clusterCfg.CloudCredentials)
+					if terminateErr != nil {
+						log.Fatal.Println(terminateErr)
+					}
+				}
 				return false, ansibleErr
 			}
+		}
+		state.PreviousState = state.CurrentState
+		state.CurrentState = "provisioning_scaleup_configured"
+		state.UpdateState()
+		fallthrough
+	case "provisioning_scaleup_configured":
+		// Check if node has joined the cluster
+		log.Info.Println("Waiting for new node to join the cluster...")
+		time.Sleep(40 * time.Second)
+		nodesInfo := utils.GetNodes()
+		var joined bool
+		for _, nodeIdInfo := range nodesInfo {
+			if nodeIdInfo.(map[string]string)["hostIp"] == newNodeIp {
+				joined = true
+				break
+			}
+		}
+		if !joined {
+			errMsg := "The new node doesn't seem to have joined the cluster. Please login into new node and check for opensearch logs for more details."
+			return joined, errors.New(errMsg)
+		}
+
+		// Install and start scaling manager on new node
+		hostsFileName := "ansible_scripts/install_hosts"
+		f, err := os.OpenFile(hostsFileName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+		if err != nil {
+			log.Fatal.Println(err)
+			return false, err
+		}
+		defer f.Close()
+		dataWriter := bufio.NewWriter(f)
+		dataWriter.WriteString("[new_node]\n")
+		dataWriter.WriteString("node-" + strings.ReplaceAll(newNodeIp, ".", "-") + " ansible_user=" + clusterCfg.SshUser + " roles=master,data,ingest ansible_private_host=" + newNodeIp + " ansible_ssh_private_key_file=" + clusterCfg.CloudCredentials.PemFilePath + "\n")
+		dataWriter.Flush()
+
+		ansibleErr := ansibleutils.UpdateWithTags(clusterCfg.SshUser, hostsFileName, []string{"install", "update_config", "update_pem", "start"})
+		if ansibleErr != nil {
+			log.Error.Println(ansibleErr)
+			log.Error.Println("Node scaled up but unable to run scaling manager on new node. Please check ansible logs for more details. (logs/playbook.log)")
 		}
 		state.PreviousState = state.CurrentState
 		state.CurrentState = "provisioning_scaleup_completed"
@@ -256,7 +313,6 @@ func ScaleOut(clusterCfg config.ClusterDetails, usrCfg config.UserConfig, state 
 			SimulateSharRebalancing("scaleOut", state.NumNodes, isAccelerated)
 		}
 		log.Info.Println("Waiting for the cluster to become healthy")
-		time.Sleep(time.Duration(usrCfg.PollingInterval) * time.Second)
 		if simFlag && isAccelerated {
 			fakeSleep(t)
 		}
@@ -282,6 +338,8 @@ func ScaleOut(clusterCfg config.ClusterDetails, usrCfg config.UserConfig, state 
 func ScaleIn(clusterCfg config.ClusterDetails, usrCfg config.UserConfig, state *State, t *time.Time) (bool, error) {
 	// Read the current state of scaledown process and proceed with next step
 	// If no stage was already set. The function returns an empty string. Then, start the scaledown process
+	crypto.GetDecryptedCloudCreds(&clusterCfg.CloudCredentials)
+	crypto.GetDecryptedOsCreds(&clusterCfg.OsCredentials)
 	state.GetCurrentState()
 	var removeNodeIp, removeNodeName string
 	var nodes map[string]interface{}
@@ -308,12 +366,13 @@ func ScaleIn(clusterCfg config.ClusterDetails, usrCfg config.UserConfig, state *
 			nodes = utils.GetNodes()
 			for nodeId, nodeIdInfo := range nodes {
 				if !(utils.CheckIfMaster(context.Background(), nodeId)) {
-					removeNodeIp = nodeIdInfo.(map[string]interface{})["hostIp"].(string)
-					removeNodeName = nodeIdInfo.(map[string]interface{})["name"].(string)
+					removeNodeIp = nodeIdInfo.(map[string]string)["hostIp"]
+					removeNodeName = nodeIdInfo.(map[string]string)["name"]
 					break
 				}
 			}
 		}
+		log.Info.Println("Node identified for removal: ", removeNodeName, removeNodeIp)
 		state.PreviousState = state.CurrentState
 		state.CurrentState = "scaledown_node_identified"
 		state.UpdateState()
@@ -332,8 +391,9 @@ func ScaleIn(clusterCfg config.ClusterDetails, usrCfg config.UserConfig, state *
 				fakeSleep(t)
 			}
 		} else {
+			log.Info.Println("Configuring to remove the node from cluster through ansible")
 			hostsFileName := "ansible_scripts/hosts"
-			username := "ubuntu"
+			username := clusterCfg.SshUser
 			f, err := os.OpenFile(hostsFileName, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 			if err != nil {
 				log.Error.Println(err)
@@ -341,19 +401,21 @@ func ScaleIn(clusterCfg config.ClusterDetails, usrCfg config.UserConfig, state *
 			}
 			defer f.Close()
 			dataWriter := bufio.NewWriter(f)
-			dataWriter.WriteString("[current-nodes]\n")
+			dataWriter.WriteString("[current_nodes]\n")
 			for _, nodeIdInfo := range nodes {
-				if nodeIdInfo.(map[string]interface{})["hostIp"].(string) != removeNodeIp {
-					_, _ = dataWriter.WriteString(nodeIdInfo.(map[string]interface{})["name"].(string) + " " + "ansible_user=" + username + " roles=master,data,ingest ansible_private_host=" + nodeIdInfo.(map[string]interface{})["hostIp"].(string) + " ansible_ssh_private_key_file=./testing-scaling-manager.pem\n")
+				if nodeIdInfo.(map[string]string)["hostIp"] != removeNodeIp {
+					_, writeErr := dataWriter.WriteString(nodeIdInfo.(map[string]string)["name"] + " ansible_user=" + username + " roles=master,data,ingest ansible_private_host=" + nodeIdInfo.(map[string]string)["hostIp"] + " ansible_ssh_private_key_file=" + clusterCfg.CloudCredentials.PemFilePath + "\n")
+					if writeErr != nil {
+						log.Error.Println("Error writing the node data into hosts file", writeErr)
+					}
 				}
 			}
-			dataWriter.WriteString("[remove-node]\n")
-			dataWriter.WriteString(removeNodeName + " " + "ansible_user=" + username + " roles=master,data,ingest ansible_private_host=" + removeNodeIp + " ansible_ssh_private_key_file=./testing-scaling-manager.pem\n")
+			dataWriter.WriteString("[remove_node]\n")
+			dataWriter.WriteString(removeNodeName + " ansible_user=" + username + " roles=master,data,ingest ansible_private_host=" + removeNodeIp + " ansible_ssh_private_key_file=" + clusterCfg.CloudCredentials.PemFilePath + "\n")
 			dataWriter.Flush()
 			log.Info.Println("Removing node ***********************************:", removeNodeName)
-			ansibleErr := CallAnsible(username, hostsFileName, clusterCfg, "scale_down")
+			ansibleErr := ansibleutils.CallAnsible(username, hostsFileName, clusterCfg, "scale_down")
 			if ansibleErr != nil {
-				log.Fatal.Println(err)
 				return false, ansibleErr
 			}
 		}
@@ -362,7 +424,8 @@ func ScaleIn(clusterCfg config.ClusterDetails, usrCfg config.UserConfig, state *
 		state.UpdateState()
 		fallthrough
 	case "provisioned_scaledown_on_cluster":
-		terminateErr := TerminateInstance(removeNodeIp)
+		log.Info.Println("Terminating the instance")
+		terminateErr := TerminateInstance(removeNodeIp, clusterCfg.CloudCredentials)
 		if terminateErr != nil {
 			log.Fatal.Println(terminateErr)
 			return false, terminateErr
@@ -380,7 +443,6 @@ func ScaleIn(clusterCfg config.ClusterDetails, usrCfg config.UserConfig, state *
 		log.Info.Println("Wait for the cluster to become healthy and then proceed")
 		CheckClusterHealth(state, usrCfg, t)
 		log.Info.Println("Shutdown the node")
-		time.Sleep(time.Duration(usrCfg.PollingInterval) * time.Second)
 		if simFlag && isAccelerated {
 			fakeSleep(t)
 		}
@@ -518,9 +580,9 @@ func SetBackToNormal(state *State) {
 
 // Inputs:
 //
-//	     state (*State): Pointer to the State struct
-//		status (string): Status of the Provisioning
-//		err (error): Error if any during provisioning
+//	state (*State): Pointer to the State struct
+//	   status (string): Status of the Provisioning
+//	   err (error): Error if any during provisioning
 //
 // Description:
 //

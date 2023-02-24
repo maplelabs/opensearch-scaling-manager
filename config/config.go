@@ -4,15 +4,16 @@ import (
 	"io/ioutil"
 	"os"
 	"regexp"
+
+	"github.com/go-playground/validator/v10"
 	"github.com/maplelabs/opensearch-scaling-manager/cluster"
 	"github.com/maplelabs/opensearch-scaling-manager/logger"
 	"github.com/maplelabs/opensearch-scaling-manager/recommendation"
-
-	"github.com/go-playground/validator/v10"
 	"gopkg.in/yaml.v3"
 )
 
 var log logger.LOG
+var ConfigFileName = "config.yaml"
 
 // Input:
 //
@@ -36,10 +37,12 @@ type OsCredentials struct {
 
 // This struct contains the Cloud Secret Key and Access Key via which we can connect to the cloud.
 type CloudCredentials struct {
+	PemFilePath string `yaml:"pem_file_path" validate:"required" json:"pem_file_path"`
 	// SecretKey indicates the Secret key for connecting to the cloud.
 	SecretKey string `yaml:"secret_key" validate:"required" json:"secret_key"`
 	// AccessKey indicates the Access key for connecting to the cloud.
 	AccessKey string `yaml:"access_key" validate:"required" json:"access_key"`
+	Region    string `yaml:"region" validate:"required" json:"region"`
 }
 
 // This struct contains the data structure to parse the cluster details present in the configuration file.
@@ -49,6 +52,7 @@ type ClusterDetails struct {
 	LaunchTemplateId      string           `yaml:"launch_template_id" validate:"required" json:"launch_template_id"`
 	LaunchTemplateVersion string           `yaml:"launch_template_version" validate:"required" json:"launch_template_version"`
 	SshUser               string           `yaml:"os_user" validate:"required" json:"os_user"`
+	OsGroup               string           `yaml:"os_group" validate:"required" json:"os_group"`
 	OpensearchVersion     string           `yaml:"os_version" validate:"required" json:"os_version"`
 	OpensearchHome        string           `yaml:"os_home" validate:"required" json:"os_home"`
 	DomainName            string           `yaml:"domain_name" validate:"required" json:"domain_name"`
@@ -58,7 +62,7 @@ type ClusterDetails struct {
 
 // Config for application behaviour from user
 type UserConfig struct {
-	MonitorWithLogs      bool `yaml:"monitor_with_logs" validate:"required"`
+	MonitorWithLogs      bool `yaml:"monitor_with_logs"`
 	MonitorWithSimulator bool `yaml:"monitor_with_simulator"`
 	PurgeAfter           int  `yaml:"purge_old_docs_after_hours" validate:"required"`
 	PollingInterval      int  `yaml:"polling_interval_in_secs" validate:"required"`
@@ -73,16 +77,18 @@ type ConfigStruct struct {
 }
 
 // Inputs:
-//		path (string): The path of the configuration file.
+//
+//	path (string): The path of the configuration file.
 //
 // Description:
-//		This function will be parsing the provided configuration file and populate the ConfigStruct.
+//
+//	This function will be parsing the provided configuration file and populate the ConfigStruct.
 //
 // Return:
-//	 (ConfigStruct, error): Return the ConfigStruct and error if any
-
-func GetConfig(path string) (ConfigStruct, error) {
-	yamlConfig, err := os.Open(path)
+//
+//	(ConfigStruct, error): Return the ConfigStruct and error if any
+func GetConfig() (ConfigStruct, error) {
+	yamlConfig, err := os.Open(ConfigFileName)
 	if err != nil {
 		log.Panic.Println("Unable to read the config file: ", err)
 		panic(err)
@@ -92,7 +98,7 @@ func GetConfig(path string) (ConfigStruct, error) {
 	var config = new(ConfigStruct)
 	err = yaml.Unmarshal(configByte, &config)
 	if err != nil {
-		log.Panic.Println("Unmarshal: ", err)
+		log.Panic.Println("Unmarshal Error : ", err)
 		panic(err)
 	}
 	err = validation(*config)
@@ -100,13 +106,13 @@ func GetConfig(path string) (ConfigStruct, error) {
 }
 
 // Inputs:
-//		config (ConfigStruct): config structure populated with unmarshalled data.
+//      config (ConfigStruct): config structure populated with unmarshalled data.
 //
 // Description:
-//		This function will be validating the configuration structure.
+//      This function will be validating the configuration structure.
 //
 // Return:
-//		(error): Return the error if there is a validation error.
+//      (error): Return the error if there is a validation error.
 
 func validation(config ConfigStruct) error {
 	validate := validator.New()
@@ -150,4 +156,32 @@ func isValidTaskName(fl validator.FieldLevel) bool {
 	TaskNameRegex := regexp.MustCompile(TaskNameRegexString)
 
 	return TaskNameRegex.MatchString(fl.Field().String())
+}
+
+// Inputs:
+//
+//	conf (ConfigStruct) : Credentials encrypted structure of the config.yaml file
+//
+// Description:
+//
+//	This function updates the config.yaml file with encrypted credentials ConfigStruct.
+//
+// Return:
+//
+//	(error) : Error (if any), else nil
+func UpdateConfigFile(conf ConfigStruct) error {
+	conf_byte, err := yaml.Marshal(&conf)
+	if err != nil {
+		log.Error.Println("Error marshalling the ConfigStruct : ", err)
+		return err
+	}
+
+	yaml_content := "---\n" + string(conf_byte)
+	err = ioutil.WriteFile(ConfigFileName, []byte(yaml_content), 0)
+	if err != nil {
+		log.Error.Println("Error writing the config yaml file : ", err)
+		return err
+	}
+
+	return nil
 }
