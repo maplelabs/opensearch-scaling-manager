@@ -23,7 +23,7 @@ var seed = time.Now().Unix()
 var SecretFilepath = ".secret.txt"
 
 // Initializing logger module
-func Initialize(callerMethod string) {
+func Initialize() {
 	log.Init("logger")
 	log.Info.Println("Crypto module initiated")
 	mrand.Seed(seed)
@@ -39,9 +39,7 @@ func Initialize(callerMethod string) {
 	}
 
 	osutils.InitializeOsClient(configStruct.ClusterDetails.OsCredentials.OsAdminUsername, configStruct.ClusterDetails.OsCredentials.OsAdminPassword)
-	if callerMethod == "main" {
-		UpdateSecretAndEncryptCreds(true, configStruct)
-	}
+	UpdateSecretAndEncryptCreds(true, configStruct)
 }
 
 // bytes is used when creating ciphers for the string

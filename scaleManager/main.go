@@ -77,8 +77,6 @@ func Run() {
 		panic(err)
 	}
 
-	go fileWatch(configStruct)
-
 	// A periodic check if there is a change in master node to pick up incomplete provisioning
 	go periodicProvisionCheck(configStruct.UserConfig.PollingInterval, t)
 	ticker := time.Tick(time.Duration(configStruct.UserConfig.PollingInterval) * time.Second)
@@ -181,7 +179,7 @@ func periodicProvisionCheck(pollingInterval int, t *time.Time) {
 
 // This function monitors the config.yaml residing directory for any writes continuously and on
 // noticing a write event, updates the encrypted creds in the config file.
-func fileWatch(previousConfigStruct config.ConfigStruct) {
+func FileWatch(previousConfigStruct config.ConfigStruct) {
 	//Adding file watcher to detect the change in configuration
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
