@@ -7,7 +7,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	crypto "github.com/maplelabs/opensearch-scaling-manager/crypto"
 	"github.com/maplelabs/opensearch-scaling-manager/logger"
 	app "github.com/maplelabs/opensearch-scaling-manager/scaleManager"
 )
@@ -64,7 +63,6 @@ func init() {
 //
 //	(error): Returns error upon unsuccessful execution
 func start() error {
-	crypto.Initialize("main")
 	app.Initialize()
 	app.Run()
 	return nil
