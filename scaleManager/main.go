@@ -8,13 +8,14 @@ import (
 
 	"github.com/maplelabs/opensearch-scaling-manager/config"
 	"github.com/maplelabs/opensearch-scaling-manager/crypto"
+	fetch "github.com/maplelabs/opensearch-scaling-manager/fetchmetrics"
 	"github.com/maplelabs/opensearch-scaling-manager/logger"
 	"github.com/maplelabs/opensearch-scaling-manager/provision"
 	"github.com/maplelabs/opensearch-scaling-manager/recommendation"
 	utils "github.com/maplelabs/opensearch-scaling-manager/utilities"
 
-	cron "github.com/robfig/cron/v3"
 	"github.com/fsnotify/fsnotify"
+	cron "github.com/robfig/cron/v3"
 	"github.com/tkuchiki/faketime"
 )
 
@@ -252,16 +253,16 @@ func StartFetchMetrics() {
 // Input:
 //
 //	cronTasks ([]]recommendation.Task): List of tasks to be added to Cron Job
-// 	state (*provision.State): A pointer to the state struct which is state maintained in OS document
+//	state (*provision.State): A pointer to the state struct which is state maintained in OS document
 //	clusterCfg (config.ClusterDetails): Cluster Level config details
 //	usrCfg (config.UserConfig): User defined config for application behavior
-// 
+//
 // Description:
-// 
-//	At each polling interval creates the cron jobs based on the config file. It removes the Cron Jobs that were 
-//  added in previous polling interval and creates required jobs. It will use the list of tasks (cronTasks) to 
-// 	schedule and create cron job.
-// 	
+//
+//		At each polling interval creates the cron jobs based on the config file. It removes the Cron Jobs that were
+//	 added in previous polling interval and creates required jobs. It will use the list of tasks (cronTasks) to
+//		schedule and create cron job.
+//
 // Return:
 func CreateCronJob(cronTasks []recommendation.Task, state *provision.State, clusterCfg config.ClusterDetails, userCfg config.UserConfig, t *time.Time) {
 	for _, jobs := range cronJob.Entries() {
