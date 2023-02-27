@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
@@ -29,7 +28,7 @@ var cryptoStartCmd = &cobra.Command{
 			CryptoStop(stop_pid)
 		} else if decrypt_credentials != "" {
 			decryptedCredentials := CryptoDecrypt(decrypt_credentials)
-			fmt.Println(string(decryptedCredentials))
+			fmt.Println(decryptedCredentials)
 		} else if start != "" && stop_pid != "" {
 			log.Panic.Println("Please provide either start or stop command.")
 		}
@@ -116,31 +115,29 @@ func CryptoStop(pid string) error {
 	return nil
 }
 
-func CryptoDecrypt(credentials string) []byte {
-	var decryptedCredentials []byte
-	var jsonErr error
+func CryptoDecrypt(credentials string) string {
+	var decryptedCredentials string
 
 	configStruct, err := config.GetConfig()
 	if err != nil {
 		log.Panic.Println("The recommendation can not be made as there is an error in the validation of config file.", err)
 		panic(err)
 	}
-	if credentials == "os_credentials" {
+	if credentials == "os_username" {
 		crypto.GetDecryptedOsCreds(&configStruct.ClusterDetails.OsCredentials)
-		decryptedCredentials, jsonErr = json.MarshalIndent(configStruct.ClusterDetails.OsCredentials, "", "\t")
-		if jsonErr != nil {
-			log.Panic.Println("Error converting struct to json: ", jsonErr)
-			panic(jsonErr)
-		}
-	} else if credentials == "cloud_credentials" {
+		decryptedCredentials = configStruct.ClusterDetails.OsCredentials.OsAdminUsername
+	} else if credentials == "os_password" {
+		crypto.GetDecryptedOsCreds(&configStruct.ClusterDetails.OsCredentials)
+		decryptedCredentials = configStruct.ClusterDetails.OsCredentials.OsAdminPassword
+	} else if credentials == "cloud_secret_key" {
 		crypto.GetDecryptedCloudCreds(&configStruct.ClusterDetails.CloudCredentials)
-		decryptedCredentials, jsonErr = json.MarshalIndent(configStruct.ClusterDetails.CloudCredentials, "", "\t")
-		if jsonErr != nil {
-			log.Panic.Println("Error converting struct to json: ", jsonErr)
-			panic(jsonErr)
-		}
+		decryptedCredentials = configStruct.ClusterDetails.CloudCredentials.SecretKey
+	} else if credentials == "cloud_access_key" {
+		crypto.GetDecryptedCloudCreds(&configStruct.ClusterDetails.CloudCredentials)
+		decryptedCredentials = configStruct.ClusterDetails.CloudCredentials.AccessKey
 	} else {
-		log.Panic.Println("Please pass correct arguement. Please Pass os_credentials to decrypt os credentials or cloud_credentials to decrypt cloud credentials")
+		log.Panic.Println("Please pass correct arguement.")
+		log.Panic.Println("Please Pass os_username, os_password, cloud_secret_key or cloud_access_key to decrypt the credentials")
 	}
 	return decryptedCredentials
 }
