@@ -19,19 +19,14 @@ import (
 
 var log = new(logger.LOG)
 var EncryptionSecret string
+var configStruct = new(config.ConfigStruct)
 var seed = time.Now().Unix()
 var SecretFilepath = ".secret.txt"
 
 func init() {
 	log.Init("logger")
 	log.Info.Println("Crypto module initiated")
-	if _, err := os.Stat(SecretFilepath); err == nil {
-		EncryptionSecret = GetEncryptionSecret()
-	}
-}
 
-// Initializing logger module
-func Initialize() {
 	mrand.Seed(seed)
 	configStruct, err := config.GetConfig()
 	if err != nil {
@@ -45,7 +40,11 @@ func Initialize() {
 	}
 
 	osutils.InitializeOsClient(configStruct.ClusterDetails.OsCredentials.OsAdminUsername, configStruct.ClusterDetails.OsCredentials.OsAdminPassword)
-	UpdateSecretAndEncryptCreds(true, configStruct)
+}
+
+// Initializing logger module
+func Initialize() {
+	UpdateSecretAndEncryptCreds(true, *configStruct)
 }
 
 // bytes is used when creating ciphers for the string
