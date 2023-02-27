@@ -271,7 +271,9 @@ func CreateCronJob(cronTasks []recommendation.Task, state *provision.State, clus
 
 	for _, cronTask := range cronTasks {
 		for _, rules := range cronTask.Rules {
-			cronJob.AddFunc(rules.SchedulingTime, provision.TriggerCron(rules.NumNodesRequired, cronTask.TaskName, state, clusterCfg, userCfg, rules.SchedulingTime, t))
+			cronJob.AddFunc(rules.SchedulingTime, func() {
+				provision.TriggerCron(rules.NumNodesRequired, cronTask.TaskName, state, clusterCfg, userCfg, rules.SchedulingTime, t)
+			})
 		}
 	}
 	cronJob.Start()
