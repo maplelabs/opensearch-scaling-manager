@@ -35,4 +35,5 @@ func init() {
 	scaleManagerCmd.AddCommand(startCmd)
 	scaleManagerCmd.AddCommand(stopCmd)
 	scaleManagerCmd.AddCommand(fetchMetricStartCmd)
+	scaleManagerCmd.AddCommand(cryptoStartCmd)
 }
