@@ -15,6 +15,7 @@ import (
 	utils "github.com/maplelabs/opensearch-scaling-manager/utilities"
 
 	"github.com/fsnotify/fsnotify"
+	cron "github.com/robfig/cron/v3"
 	"github.com/tkuchiki/faketime"
 )
 
@@ -27,10 +28,16 @@ var log logger.LOG
 // A global variable which lets the provision continue from where it left off if there was an abrupt stop and restart of application.
 var firstExecution bool
 
+// A global variable to keep track of cronJob details
+var cronJob = cron.New()
+
 var seed = time.Now().Unix()
 
+func init() {
+	log.Init("logger")
+	log.Info.Println("Main module initialized")
+}
 // Input:
-//
 // Description:
 //
 //	Initializes the main module
@@ -40,8 +47,6 @@ var seed = time.Now().Unix()
 //
 // Return:
 func Initialize() {
-	log.Init("logger")
-	log.Info.Println("Main module initialized")
 
 	firstExecution = true
 
@@ -106,7 +111,10 @@ func Run() {
 			task.Tasks = configStruct.TaskDetails
 			userCfg := configStruct.UserConfig
 			clusterCfg := configStruct.ClusterDetails
-			recommendationList := task.EvaluateTask(userCfg.PollingInterval, userCfg.MonitorWithSimulator, userCfg.IsAccelerated)
+			recommendationList, cronJobList := task.EvaluateTask(userCfg.PollingInterval, userCfg.MonitorWithSimulator, userCfg.IsAccelerated)
+			if len(cronJobList) > 0 {
+				CreateCronJob(cronJobList, state, clusterCfg, userCfg, t)
+			}
 			provision.GetRecommendation(state, recommendationList, clusterCfg, userCfg, t)
 			if configStruct.UserConfig.MonitorWithSimulator && configStruct.UserConfig.IsAccelerated {
 				*t = t.Add(time.Minute * 5)
@@ -189,30 +197,32 @@ func FileWatch(previousConfigStruct config.ConfigStruct) {
 			select {
 			// watch for events
 			case event := <-watcher.Events:
-				if utils.CheckIfMaster(context.Background(), "") && strings.Contains(event.Name, config.ConfigFileName) {
-					currentConfigStruct, err := config.GetConfig()
-					if err != nil {
-						log.Panic.Println("Error while reading config file : ", err)
-						panic(err)
-					}
-					currOsCredentials := currentConfigStruct.ClusterDetails.OsCredentials
-					prevOsCredentials := previousConfigStruct.ClusterDetails.OsCredentials
-					currCloudCredentials := currentConfigStruct.ClusterDetails.CloudCredentials
-					prevCloudCredentials := previousConfigStruct.ClusterDetails.CloudCredentials
-					if crypto.OsCredsMismatch(currOsCredentials, prevOsCredentials) || crypto.CloudCredsMismatch(currCloudCredentials, prevCloudCredentials) {
-						log.Info.Println("FILE_EVENT encountered : Creds updated")
-						crypto.UpdateSecretAndEncryptCreds(false, currentConfigStruct)
-						previousConfigStruct, _ = config.GetConfig()
+				if strings.Contains(event.Name, config.ConfigFileName) {
+					if utils.CheckIfMaster(context.Background(), "") {
+						currentConfigStruct, err := config.GetConfig()
+						if err != nil {
+							log.Panic.Println("Error while reading config file : ", err)
+							panic(err)
+						}
+						currOsCredentials := currentConfigStruct.ClusterDetails.OsCredentials
+						prevOsCredentials := previousConfigStruct.ClusterDetails.OsCredentials
+						currCloudCredentials := currentConfigStruct.ClusterDetails.CloudCredentials
+						prevCloudCredentials := previousConfigStruct.ClusterDetails.CloudCredentials
+						if crypto.OsCredsMismatch(currOsCredentials, prevOsCredentials) || crypto.CloudCredsMismatch(currCloudCredentials, prevCloudCredentials) {
+							log.Info.Println("FILE_EVENT encountered : Creds updated")
+							crypto.UpdateSecretAndEncryptCreds(false, currentConfigStruct)
+							previousConfigStruct, _ = config.GetConfig()
+						} else {
+							log.Info.Println("FILE_EVENT encountered : Creds not updated")
+						}
 					} else {
-						log.Info.Println("FILE_EVENT encountered : Creds not updated")
-					}
-				} else if !utils.CheckIfMaster(context.Background(), "") {
-					current_secret := crypto.GetEncryptionSecret()
-					if crypto.EncryptionSecret != current_secret {
-						crypto.EncryptionSecret = current_secret
-						config_struct, _ := config.GetConfig()
-						crypto.DecryptCredsAndInitializeOs(config_struct)
-
+						current_secret := crypto.GetEncryptionSecret()
+						if crypto.EncryptionSecret != current_secret {
+							log.Info.Println("Change in Creds detected")
+							crypto.EncryptionSecret = current_secret
+							config_struct, _ := config.GetConfig()
+							crypto.DecryptCredsAndInitializeOs(config_struct)
+						}
 					}
 				}
 
@@ -242,6 +252,35 @@ func StartFetchMetrics() {
 		log.Warn.Println("MonitorWithSimulator is enabled. Please disable and re-run the fetch-metrics module.")
 		os.Exit(1)
 	}
+}
+
+// Input:
+//
+//	cronTasks ([]]recommendation.Task): List of tasks to be added to Cron Job
+//	state (*provision.State): A pointer to the state struct which is state maintained in OS document
+//	clusterCfg (config.ClusterDetails): Cluster Level config details
+//	usrCfg (config.UserConfig): User defined config for application behavior
+//
+// Description:
+//
+//		At each polling interval creates the cron jobs based on the config file. It removes the Cron Jobs that were
+//	 added in previous polling interval and creates required jobs. It will use the list of tasks (cronTasks) to
+//		schedule and create cron job.
+//
+// Return:
+func CreateCronJob(cronTasks []recommendation.Task, state *provision.State, clusterCfg config.ClusterDetails, userCfg config.UserConfig, t *time.Time) {
+	for _, jobs := range cronJob.Entries() {
+		cronJob.Remove(jobs.ID)
+	}
+
+	for _, cronTask := range cronTasks {
+		for _, rules := range cronTask.Rules {
+			cronJob.AddFunc(rules.SchedulingTime, func() {
+				provision.TriggerCron(rules.NumNodesRequired, cronTask.TaskName, state, clusterCfg, userCfg, rules.SchedulingTime, t)
+			})
+		}
+	}
+	cronJob.Start()
 }
 
 // Input:
