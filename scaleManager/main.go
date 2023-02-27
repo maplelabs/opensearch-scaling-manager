@@ -33,6 +33,10 @@ var cronJob = cron.New()
 
 var seed = time.Now().Unix()
 
+func init() {
+	log.Init("logger")
+	log.Info.Println("Main module initialized")
+}
 // Input:
 // Description:
 //
@@ -43,8 +47,6 @@ var seed = time.Now().Unix()
 //
 // Return:
 func Initialize() {
-	log.Init("logger")
-	log.Info.Println("Main module initialized")
 
 	firstExecution = true
 
