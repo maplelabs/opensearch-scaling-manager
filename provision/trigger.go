@@ -262,5 +262,7 @@ func TriggerCron(nodesRequired int, t *time.Time, state *State, clusterCfg confi
 	numNodes, _ := strconv.Atoi(subMatch[2])
 	operation := subMatch[1]
 
+	log.Info.Println("The ", task, " is triggered as event based scaling and will be provisioned.")
+
 	TriggerProvision(clusterCfg, userCfg, state, numNodes, t, operation, ruleResponsible)
 }
