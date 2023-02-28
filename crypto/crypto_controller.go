@@ -25,14 +25,14 @@ var SecretFilepath = ".secret.txt"
 func init() {
 	log.Init("logger")
 	log.Info.Println("Crypto module initiated")
-	if _, err := os.Stat(SecretFilepath); err == nil {
-		EncryptionSecret = GetEncryptionSecret()
-	}
+
+	mrand.Seed(seed)
+	configStruct := parseConfig()
+
+	osutils.InitializeOsClient(configStruct.ClusterDetails.OsCredentials.OsAdminUsername, configStruct.ClusterDetails.OsCredentials.OsAdminPassword)
 }
 
-// Initializing logger module
-func Initialize() {
-	mrand.Seed(seed)
+func parseConfig() config.ConfigStruct {
 	configStruct, err := config.GetConfig()
 	if err != nil {
 		log.Error.Println("Error validating config file", err)
@@ -43,8 +43,12 @@ func Initialize() {
 		GetDecryptedOsCreds(&configStruct.ClusterDetails.OsCredentials)
 		GetDecryptedCloudCreds(&configStruct.ClusterDetails.CloudCredentials)
 	}
+	return configStruct
+}
 
-	osutils.InitializeOsClient(configStruct.ClusterDetails.OsCredentials.OsAdminUsername, configStruct.ClusterDetails.OsCredentials.OsAdminPassword)
+// Initializing logger module
+func Initialize() {
+	configStruct := parseConfig()
 	UpdateSecretAndEncryptCreds(true, configStruct)
 }
 
