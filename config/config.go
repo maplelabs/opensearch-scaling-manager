@@ -8,7 +8,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/maplelabs/opensearch-scaling-manager/cluster"
 	"github.com/maplelabs/opensearch-scaling-manager/logger"
-	"github.com/maplelabs/opensearch-scaling-manager/recommendation"
+	"github.com/maplelabs/opensearch-scaling-manager/task"
 	"gopkg.in/yaml.v3"
 )
 
@@ -71,9 +71,9 @@ type UserConfig struct {
 
 // This struct contains the data structure to parse the configuration file.
 type ConfigStruct struct {
-	UserConfig     UserConfig            `yaml:"user_config"`
-	ClusterDetails ClusterDetails        `yaml:"cluster_details"`
-	TaskDetails    []recommendation.Task `yaml:"task_details" validate:"gt=0,dive"`
+	UserConfig     UserConfig     `yaml:"user_config"`
+	ClusterDetails ClusterDetails `yaml:"cluster_details"`
+	TaskDetails    []task.Task    `yaml:"task_details" validate:"gt=0,dive"`
 }
 
 // Inputs:

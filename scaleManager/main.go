@@ -12,10 +12,10 @@ import (
 	"github.com/maplelabs/opensearch-scaling-manager/logger"
 	"github.com/maplelabs/opensearch-scaling-manager/provision"
 	"github.com/maplelabs/opensearch-scaling-manager/recommendation"
+	"github.com/maplelabs/opensearch-scaling-manager/task"
 	utils "github.com/maplelabs/opensearch-scaling-manager/utilities"
 
 	"github.com/fsnotify/fsnotify"
-	cron "github.com/robfig/cron/v3"
 	"github.com/tkuchiki/faketime"
 )
 
@@ -27,9 +27,6 @@ var log logger.LOG
 
 // A global variable which lets the provision continue from where it left off if there was an abrupt stop and restart of application.
 var firstExecution bool
-
-// A list to keep track of active cronjobs
-var cronJobList []*cron.Cron
 
 var seed = time.Now().Unix()
 
@@ -80,7 +77,6 @@ func Run() {
 		log.Panic.Println("The recommendation can not be made as there is an error in the validation of config file.", err)
 		panic(err)
 	}
-
 	// A periodic check if there is a change in master node to pick up incomplete provisioning
 	go periodicProvisionCheck(configStruct.UserConfig.PollingInterval, t)
 	ticker := time.Tick(time.Duration(configStruct.UserConfig.PollingInterval) * time.Second)
@@ -102,7 +98,7 @@ func Run() {
 			//              if firstExecution || state.CurrentState == "normal" {
 			firstExecution = false
 			// This function will be responsible for parsing the config file and fill in task_details struct.
-			var task = new(recommendation.TaskDetails)
+			var task = new(task.TaskDetails)
 			configStruct, err := config.GetConfig()
 			if err != nil {
 				log.Error.Println("The recommendation can not be made as there is an error in the validation of config file.")
@@ -112,9 +108,11 @@ func Run() {
 			task.Tasks = configStruct.TaskDetails
 			userCfg := configStruct.UserConfig
 			clusterCfg := configStruct.ClusterDetails
-			recommendationList, cronJobTaskList := task.EvaluateTask(userCfg.PollingInterval, userCfg.MonitorWithSimulator, userCfg.IsAccelerated)
-			if len(cronJobTaskList) > 0 {
-				CreateCronJob(cronJobTaskList, state, clusterCfg, userCfg, t)
+			myTaskDetails := (recommendation.MyTaskDetails)(*task)
+			metricTasks, eventTasks := myTaskDetails.ParseTasks()
+			recommendationList := metricTasks.EvaluateTask(userCfg.PollingInterval, userCfg.MonitorWithSimulator, userCfg.IsAccelerated)
+			if len(eventTasks.Tasks) > 0 {
+				eventTasks.CreateCronJob(state, clusterCfg, userCfg, t)
 			}
 			provision.GetRecommendation(state, recommendationList, clusterCfg, userCfg, t)
 			if configStruct.UserConfig.MonitorWithSimulator && configStruct.UserConfig.IsAccelerated {
@@ -252,43 +250,6 @@ func StartFetchMetrics() {
 	} else {
 		log.Warn.Println("MonitorWithSimulator is enabled. Please disable and re-run the fetch-metrics module.")
 		os.Exit(1)
-	}
-}
-
-// Input:
-//
-//	cronTasks ([]]recommendation.Task): List of tasks to be added to Cron Job
-//	state (*provision.State): A pointer to the state struct which is state maintained in OS document
-//	clusterCfg (config.ClusterDetails): Cluster Level config details
-//	usrCfg (config.UserConfig): User defined config for application behavior
-//
-// Description:
-//
-//	At each polling interval creates the cron jobs based on the config file. It removes the Cron Jobs that were
-//	added in previous polling interval and creates required jobs. It will use the list of tasks (cronTasks) to
-//	schedule and create cron job.
-//
-// Return:
-func CreateCronJob(cronTasks []recommendation.Task, state *provision.State, clusterCfg config.ClusterDetails, userCfg config.UserConfig, t *time.Time) {
-	for _, cronJob := range cronJobList {
-		for _, jobs := range cronJob.Entries() {
-			cronJob.Remove(jobs.ID)
-		}
-	}
-
-	cronJobList = nil
-
-	for _, cronTask := range cronTasks {
-		cronTask := cronTask
-		cronJob := cron.New()
-		for _, rules := range cronTask.Rules {
-			rules := rules
-			cronJob.AddFunc(rules.SchedulingTime, func() {
-				provision.TriggerCron(rules.NumNodesRequired, cronTask.TaskName, state, clusterCfg, userCfg, rules.SchedulingTime, t)
-			})
-			cronJobList = append(cronJobList, cronJob)
-		}
-		cronJob.Start()
 	}
 }
 
