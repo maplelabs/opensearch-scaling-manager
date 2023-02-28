@@ -37,6 +37,7 @@ func init() {
 	log.Init("logger")
 	log.Info.Println("Main module initialized")
 }
+
 // Input:
 // Description:
 //
@@ -182,7 +183,7 @@ func periodicProvisionCheck(pollingInterval int, t *time.Time) {
 
 // This function monitors the config.yaml residing directory for any writes continuously and on
 // noticing a write event, updates the encrypted creds in the config file.
-func FileWatch(previousConfigStruct config.ConfigStruct) {
+func FileWatch(previousConfigStruct config.ConfigStruct, moduleName string) {
 	//Adding file watcher to detect the change in configuration
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -198,7 +199,7 @@ func FileWatch(previousConfigStruct config.ConfigStruct) {
 			// watch for events
 			case event := <-watcher.Events:
 				if strings.Contains(event.Name, config.ConfigFileName) {
-					if utils.CheckIfMaster(context.Background(), "") {
+					if utils.CheckIfMaster(context.Background(), "") && moduleName == "crypto" {
 						currentConfigStruct, err := config.GetConfig()
 						if err != nil {
 							log.Panic.Println("Error while reading config file : ", err)

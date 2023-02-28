@@ -4,6 +4,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/maplelabs/opensearch-scaling-manager/config"
 	app "github.com/maplelabs/opensearch-scaling-manager/scaleManager"
 	"github.com/spf13/cobra"
 )
@@ -52,6 +53,12 @@ func init() {
 func fetchMetricStart() {
 	app.Initialize()
 	app.StartFetchMetrics()
+	configStruct, err := config.GetConfig()
+	if err != nil {
+		log.Panic.Println("The recommendation can not be made as there is an error in the validation of config file.", err)
+		panic(err)
+	}
+	app.FileWatch(configStruct, "fetchMetrics")
 }
 
 // Input:

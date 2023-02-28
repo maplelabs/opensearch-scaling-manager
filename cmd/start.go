@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/maplelabs/opensearch-scaling-manager/config"
 	"github.com/maplelabs/opensearch-scaling-manager/logger"
 	app "github.com/maplelabs/opensearch-scaling-manager/scaleManager"
 )
@@ -65,6 +66,12 @@ func init() {
 func start() error {
 	app.Initialize()
 	app.Run()
+	configStruct, err := config.GetConfig()
+	if err != nil {
+		log.Panic.Println("The recommendation can not be made as there is an error in the validation of config file.", err)
+		panic(err)
+	}
+	app.FileWatch(configStruct, "scalingManager")
 	return nil
 }
 
