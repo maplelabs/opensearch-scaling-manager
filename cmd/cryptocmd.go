@@ -65,7 +65,7 @@ func CryptoStart() {
 		log.Panic.Println("The recommendation can not be made as there is an error in the validation of config file.", err)
 		panic(err)
 	}
-	app.FileWatch(configStruct)
+	app.FileWatch(configStruct, "crypto")
 }
 
 // Input:
