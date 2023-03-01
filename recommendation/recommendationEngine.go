@@ -10,10 +10,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"regexp"
 	"github.com/maplelabs/opensearch-scaling-manager/cluster"
 	"github.com/maplelabs/opensearch-scaling-manager/cluster_sim"
+	"github.com/maplelabs/opensearch-scaling-manager/config"
 	"github.com/maplelabs/opensearch-scaling-manager/logger"
+	"regexp"
 	"strings"
 )
 
@@ -23,7 +24,7 @@ var ctx = context.Background()
 // Input:
 //
 // Description:
-//		Initialize the recommendation module.
+//              Initialize the recommendation module.
 //
 // Return:
 
@@ -32,57 +33,12 @@ func init() {
 	log.Info.Println("Recommendation module initialized")
 }
 
-// This struct contains the task to be perforrmed by the recommendation and set of rules wrt the action.
-type Task struct {
-	// TaskName indicates the name of the task to recommend by the recommendation engine.
-	TaskName string `yaml:"task_name" validate:"required,isValidTaskName"`
-	// Rules indicates list of rules to evaluate the criteria for the recomm+endation engine.
-	Rules []Rule `yaml:"rules" validate:"gt=0,dive"`
-	// Operator indicates the logical operation needs to be performed while executing the rules
-	Operator string `yaml:"operator" validate:"required,oneof=AND OR"`
-}
-
-// This struct contains the rule.
-type Rule struct {
-	// Metic indicates the name of the metric. These can be:
-	//      Cpu
-	//      Mem
-	//      Shard
-	Metric string `yaml:"metric" validate:"required,oneof=CpuUtil RamUtil HeapUtil DiskUtil NumShards"`
-	// Limit indicates the threshold value for a metric.
-	// If this threshold is achieved for a given metric for the decision periond then the rule will be activated.
-	Limit float32 `yaml:"limit" validate:"required"`
-	// Stat indicates the statistics on which the evaluation of the rule will happen.
-	// For Cpu and Mem the values can be:
-	//              Avg: The average CPU or MEM value will be calculated for a given decision period.
-	//              Count: The number of occurences where CPU or MEM value crossed the threshold limit.
-	//              Term:
-	// For rule: Shard, the stat will not be applicable as the shard will be calculated across the cluster and is not a statistical value.
-	Stat string `yaml:"stat" validate:"required,oneof=AVG COUNT TERM"`
-	// DecisionPeriod indicates the time in minutes for which a rule is evalated.
-	DecisionPeriod int `yaml:"decision_period" validate:"required,min=1"`
-	// Occurrences indicate the number of time a rule reached the threshold limit for a give decision period.
-	// It will be applicable only when the Stat is set to Count.
-	Occurrences int `yaml:"occurrences" validate:"required_if=Stat COUNT"`
-}
-
-// This struct contains the task details which is set of actions.
-type TaskDetails struct {
-	// Tasks indicates list of task.
-	// A task indicates what operation needs to be recommended by recommendation engine.
-	// As of now tasks can be of two types:
-	//
-	//      scale_up_by_1
-	//      scale_down_by_1
-	Tasks []Task `yaml:"action" validate:"gt=0,dive"`
-}
-
 // Inputs:
-//		simFlag (bool): A flag to check if the task needs to be evaluated from Opensearch data or simulated data.
-//		pollingInterval (int): Time in seconds which is the interval between each metric is pushed into the index.
+//              simFlag (bool): A flag to check if the task needs to be evaluated from Opensearch data or simulated data.
+//              pollingInterval (int): Time in seconds which is the interval between each metric is pushed into the index.
 //
 // Caller:
-//		Object of TaskDetails
+//              Object of TaskDetails
 //
 // Description:
 //              EvaluateTask will go through all the tasks one by one. and
@@ -90,17 +46,17 @@ type TaskDetails struct {
 //              If the task is meeting the criteria then it will push the task to recommendation queue.
 //
 // Return:
-//		([]map[string]string): Returns an array of the recommendations.
+//              ([]map[string]string): Returns an array of the recommendations.
 
-func (t TaskDetails) EvaluateTask(pollingInterval int, simFlag, isAccelerated bool) []map[string]string {
+func EvaluateTask(pollingInterval int, simFlag, isAccelerated bool, t config.TaskDetails) []map[string]string {
 	var recommendationArray []map[string]string
 	var isRecommendedTask bool
 	for _, v := range t.Tasks {
 		var rulesResponsibleMap = make(map[string]string)
-		isRecommendedTask, rulesResponsibleMap[v.TaskName] = v.GetNextTask(pollingInterval, simFlag, isAccelerated)
+		isRecommendedTask, rulesResponsibleMap[v.TaskName] = GetNextTask(pollingInterval, simFlag, isAccelerated, v)
 		log.Debug.Println(rulesResponsibleMap)
 		if isRecommendedTask {
-			v.PushToRecommendationQueue()
+			PushToRecommendationQueue(v)
 			recommendationArray = append(recommendationArray, rulesResponsibleMap)
 		} else {
 			log.Debug.Println(fmt.Sprintf("The %s task is not recommended as rules are not satisfied", v.TaskName))
@@ -110,8 +66,8 @@ func (t TaskDetails) EvaluateTask(pollingInterval int, simFlag, isAccelerated bo
 }
 
 // Inputs:
-//		simFlag (bool): A flag to check if the task needs to collect stats from Opensearch data or simulated data.
-//		pollingInterval (int): Time in seconds which is the interval between each metric is pushed into the index.
+//              simFlag (bool): A flag to check if the task needs to collect stats from Opensearch data or simulated data.
+//              pollingInterval (int): Time in seconds which is the interval between each metric is pushed into the index.
 //
 // Caller: Object of Task
 // Description:
@@ -125,7 +81,7 @@ func (t TaskDetails) EvaluateTask(pollingInterval int, simFlag, isAccelerated bo
 //
 //              (bool, string): Return if a task can be recommended or not(bool) and string which says the rules responsible for that recommendation.
 
-func (t Task) GetNextTask(pollingInterval int, simFlag, isAccelerated bool) (bool, string) {
+func GetNextTask(pollingInterval int, simFlag, isAccelerated bool, t config.Task) (bool, string) {
 	var isRecommendedTask bool = true
 	var isRecommendedRule bool
 	var rulesResponsible string
@@ -145,7 +101,7 @@ func (t Task) GetNextTask(pollingInterval int, simFlag, isAccelerated bool) (boo
 		// There is a possibility that each rule is taking time.
 		// What if in the case of AND the non matching rule is present at the last.
 		// What if in the case of OR the matching rule is present at the last.
-		isRecommendedRule, err = v.GetNextRule(taskOperation, pollingInterval, simFlag, isAccelerated)
+		isRecommendedRule, err = GetNextRule(taskOperation, pollingInterval, simFlag, isAccelerated, v)
 		if err != nil {
 			log.Warn.Println(fmt.Sprintf("%s for the rule: %v", err, v))
 		}
@@ -172,37 +128,37 @@ func (t Task) GetNextTask(pollingInterval int, simFlag, isAccelerated bool) (boo
 }
 
 // Input:
-//		taskOperation (string); Recommended operation
-//		simFlag (bool): A flag to check if the task needs to collect stats from Opensearch data or simulated data.
+//              taskOperation (string); Recommended operation
+//              simFlag (bool): A flag to check if the task needs to collect stats from Opensearch data or simulated data.
 //              pollingInterval (int): Time in seconds which is the interval between each metric is pushed into the index.
 //
 // Caller:
-//		Object of Rule
+//              Object of Rule
 //
 // Description:
-//		GetNextRule will fetch the metrics based on the rules MetricName and Stats using GetMetrics
-//		Then it will evaluate if the rule is meeting the criteria or not using EvaluateRule
+//              GetNextRule will fetch the metrics based on the rules MetricName and Stats using GetMetrics
+//              Then it will evaluate if the rule is meeting the criteria or not using EvaluateRule
 //
 // Return:
-// 		(bool, error): Return if a rule is meeting the criteria or not(bool) and error if any
+//              (bool, error): Return if a rule is meeting the criteria or not(bool) and error if any
 
-func (r Rule) GetNextRule(taskOperation string, pollingInterval int, simFlag, isAccelerated bool) (bool, error) {
-	cluster, err := r.GetMetrics(pollingInterval, simFlag, isAccelerated)
+func GetNextRule(taskOperation string, pollingInterval int, simFlag, isAccelerated bool, r config.Rule) (bool, error) {
+	cluster, err := GetMetrics(pollingInterval, simFlag, isAccelerated, r)
 	if err != nil {
 		return false, err
 	}
-	isRecommended := r.EvaluateRule(cluster, taskOperation)
+	isRecommended := EvaluateRule(cluster, taskOperation, r)
 	log.Debug.Println(r)
 	log.Debug.Println(isRecommended)
 	return isRecommended, nil
 }
 
 // Input:
-//		simFlag (bool): A flag to check if the task needs to collect stats from Opensearch data or simulated data.
-//		pollingInterval (int): Time in seconds which is the interval between each metric is pushed into the index.
+//              simFlag (bool): A flag to check if the task needs to collect stats from Opensearch data or simulated data.
+//              pollingInterval (int): Time in seconds which is the interval between each metric is pushed into the index.
 //
 // Caller:
-//		Object of Rule
+//              Object of Rule
 //
 // Description:
 //              GetMetrics will be getting the metrics for a metricName based on its stats
@@ -213,7 +169,7 @@ func (r Rule) GetNextRule(taskOperation string, pollingInterval int, simFlag, is
 // Return:
 //              ([]byte, error): Return marshal form of either MetricStatsCluster or MetricViolatedCountCluster struct([]byte) and error if any
 
-func (r Rule) GetMetrics(pollingInterval int, simFlag, isAccelerated bool) ([]byte, error) {
+func GetMetrics(pollingInterval int, simFlag, isAccelerated bool, r config.Rule) ([]byte, error) {
 	var clusterStats cluster.MetricStats
 	var clusterCount cluster.MetricViolatedCount
 	var clusterMetric []byte
@@ -265,20 +221,20 @@ func (r Rule) GetMetrics(pollingInterval int, simFlag, isAccelerated bool) ([]by
 }
 
 // Input:
-//		clusterMetric ([]byte): Marshal struct containing clusterMetric details based on stats.
-//		taskOperation (string); Task recommended
+//              clusterMetric ([]byte): Marshal struct containing clusterMetric details based on stats.
+//              taskOperation (string); Task recommended
 //
 // Caller:
-//		Object of Rule
+//              Object of Rule
 //
 // Description:
-//		EvaluateRule will be compare the collected metric and mentioned rule
-//		It will then decide if rules are meeting the criteria or not and return the result.
+//              EvaluateRule will be compare the collected metric and mentioned rule
+//              It will then decide if rules are meeting the criteria or not and return the result.
 //
 // Return:
 //              (bool): Return whether a rule is meeting the criteria or not.
 
-func (r Rule) EvaluateRule(clusterMetric []byte, taskOperation string) bool {
+func EvaluateRule(clusterMetric []byte, taskOperation string, r config.Rule) bool {
 	log.Debug.Println(taskOperation)
 	if r.Stat == "AVG" {
 		var clusterStats cluster.MetricStats
@@ -322,12 +278,12 @@ func (r Rule) EvaluateRule(clusterMetric []byte, taskOperation string) bool {
 // Input:
 //
 // Caller:
-//		Object of Task
+//              Object of Task
 // Description:
-//		PushToRecommendationQueue will be pushing the task which matches the criteria to recommendation queue.
+//              PushToRecommendationQueue will be pushing the task which matches the criteria to recommendation queue.
 //
 // Return:
 
-func (task Task) PushToRecommendationQueue() {
+func PushToRecommendationQueue(task config.Task) {
 	log.Info.Println(fmt.Sprintf("The %s task is recommended and will be pushed to the queue", task.TaskName))
 }
