@@ -106,7 +106,7 @@ type Rule struct {
 	// For rule: Shard, the stat will not be applicable as the shard will be calculated across the cluster and is not a statistical value.
 	Stat string `yaml:"stat,omitempty"`
 	// DecisionPeriod indicates the time in minutes for which a rule is evalated.
-	DecisionPeriod int `yaml:"decision_period,omitempty" validate:"min=60"`
+	DecisionPeriod int `yaml:"decision_period,omitempty" validate:"required_without=SchedulingTime,omitempty,min=60"`
 	// Occurrences indicate the number of time a rule reached the threshold limit for a give decision period.
 	// It will be applicable only when the Stat is set to Count.
 	Occurrences int `yaml:"occurrences_percent,omitempty" validate:"required_if=Stat COUNT,max=100"`
