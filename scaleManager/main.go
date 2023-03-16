@@ -224,8 +224,8 @@ func fileWatch(previousConfigStruct config.ConfigStruct) {
 						if crypto.EncryptionSecret != current_secret {
 							log.Info.Println("Change in Creds detected")
 							crypto.EncryptionSecret = current_secret
-							config_struct, _ := config.GetConfig()
-							crypto.DecryptCredsAndInitializeOs(config_struct)
+							// Retry for 60 times in the interval of 10 secs if the connection fails
+							crypto.DecryptCredsAndInitializeOs(60)
 						}
 					}
 				}
