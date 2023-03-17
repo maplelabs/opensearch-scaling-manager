@@ -7,7 +7,6 @@ import (
 	"errors"
 	"github.com/maplelabs/opensearch-scaling-manager/logger"
 	"net/http"
-	"os"
 
 	opensearch "github.com/opensearch-project/opensearch-go"
 	osapi "github.com/opensearch-project/opensearch-go/opensearchapi"

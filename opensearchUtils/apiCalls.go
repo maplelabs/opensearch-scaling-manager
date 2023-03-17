@@ -248,13 +248,6 @@ func doRetry(ctx context.Context, request interface{}) (*osapi.Response, error) 
 		}
 		log.Error.Println("Retrying #", i+1, reflect.TypeOf(request), " the OS API due to the error: ", resp.Status(), err)
 		time.Sleep(time.Duration(10) * time.Second)
-
-		if err == nil {
-			break
-		}
-		log.Error.Println("Retrying the OS API due to the err: ", err)
-		log.Error.Println("Retry #", i+1)
-		time.Sleep(time.Duration(10) * time.Second)
 	}
 	return resp, err
 }

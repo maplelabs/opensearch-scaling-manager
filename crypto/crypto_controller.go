@@ -25,11 +25,11 @@ var SecretFilepath = ".secret.txt"
 //
 // Description:
 //
-//	     Initializes Crypto module
-//		Reads the config.yaml file, if it is a fresh install of scaling manager, the SecretFilepath won't be present.
-//		If present, it uses the file to decrypt the credentials present in config.yaml
-//		It calls DecryptCredsAndInitializeOs to Initialize the Opensearch client with one try
-//		Then Updates the Secret file, and ecrypted credentials into config.yaml
+//	Initializes Crypto module
+//	   Reads the config.yaml file, if it is a fresh install of scaling manager, the SecretFilepath won't be present.
+//	   If present, it uses the file to decrypt the credentials present in config.yaml
+//	   It calls DecryptCredsAndInitializeOs to Initialize the Opensearch client with one try
+//	   Then Updates the Secret file, and ecrypted credentials into config.yaml
 //
 // Return:
 func init() {
@@ -41,13 +41,13 @@ func init() {
 		log.Error.Println("Error validating config file", err)
 		panic(err)
 	}
+
+	DecryptCredsAndInitializeOs(1, false, configStruct)
+
 	if _, err = os.Stat(SecretFilepath); err == nil {
-		EncryptionSecret = GetEncryptionSecret()
 		GetDecryptedOsCreds(&configStruct.ClusterDetails.OsCredentials)
 		GetDecryptedCloudCreds(&configStruct.ClusterDetails.CloudCredentials)
 	}
-
-	DecryptCredsAndInitializeOs(1)
 
 	UpdateSecretAndEncryptCreds(true, configStruct)
 }
@@ -58,10 +58,10 @@ var bytes = []byte{35, 46, 57, 24, 85, 35, 24, 74, 87, 35, 88, 98, 66, 32, 14, 0
 // Input:
 //
 // Description:
-// 	Generate a random string of length 16
+//      Generate a random string of length 16
 //
 // Return:
-//	(string): Returns the random string generated as password
+//      (string): Returns the random string generated as password
 
 func GeneratePassword() string {
 	mrand.Seed(time.Now().UnixNano())
@@ -242,8 +242,8 @@ func GetDecryptedCloudCreds(cloudCred *config.CloudCredentials) {
 
 // Input:
 //
-//		initialRun (bool): A bool value which says if this function is called from init() or in between while the application is running
-//	     config_struct (config.ConfigStruct): Config structure from the config.yaml
+//	   initialRun (bool): A bool value which says if this function is called from init() or in between while the application is running
+//	config_struct (config.ConfigStruct): Config structure from the config.yaml
 //
 // Description:
 //
@@ -271,10 +271,6 @@ func UpdateEncryptedCred(initialRun bool, config_struct config.ConfigStruct) err
 		panic(err)
 	}
 
-	// initialize new os client connection with the updated creds
-	if !initialRun {
-		DecryptCredsAndInitializeOs(60)
-	}
 	return nil
 }
 
@@ -284,23 +280,35 @@ func UpdateEncryptedCred(initialRun bool, config_struct config.ConfigStruct) err
 //
 // Description:
 //
-//	     Read the configuration file, get the decrypted Opensearch credentials and Initialize the Opensearch Client
-//		This also retries for the number of times specified in the interval of 10 seconds if there is a failure
+//	Read the configuration file, get the decrypted Opensearch credentials and Initialize the Opensearch Client
+//	   This also retries for the number of times specified in the interval of 10 seconds if there is a failure
 //
 // Return:
-func DecryptCredsAndInitializeOs(try int) {
+func DecryptCredsAndInitializeOs(try int, master bool, prevConfig config.ConfigStruct) {
 	configStruct, err := config.GetConfig()
 	if err != nil {
 		log.Error.Println("Error validating config file", err)
 		panic(err)
 	}
-	GetDecryptedOsCreds(&configStruct.ClusterDetails.OsCredentials)
+
+	if master {
+		if OsCredsMismatch(configStruct.ClusterDetails.OsCredentials, prevConfig.ClusterDetails.OsCredentials) || CloudCredsMismatch(configStruct.ClusterDetails.CloudCredentials, prevConfig.ClusterDetails.CloudCredentials) {
+			log.Info.Println("Detected creds change while Retyring OS Connection")
+			UpdateSecretAndEncryptCreds(false, configStruct)
+		}
+		prevConfig = configStruct
+	}
+
+	if _, err = os.Stat(SecretFilepath); err == nil {
+		EncryptionSecret = GetEncryptionSecret()
+		GetDecryptedOsCreds(&configStruct.ClusterDetails.OsCredentials)
+	}
 
 	osErr := osutils.InitializeOsClient(configStruct.ClusterDetails.OsCredentials.OsAdminUsername, configStruct.ClusterDetails.OsCredentials.OsAdminPassword)
 	if osErr != nil && try > 0 {
 		log.Error.Println("Retrying #", try, " on error: ", osErr)
 		time.Sleep(time.Duration(10) * time.Second)
-		DecryptCredsAndInitializeOs(try - 1)
+		DecryptCredsAndInitializeOs(try-1, master, prevConfig)
 	} else if osErr != nil {
 		log.Error.Println("Unable to connect to Opensearch even after maximum retries!!")
 		log.Error.Println("Please check the Opensearch service or recheck username/password and restart scaling manager...")
@@ -335,9 +343,9 @@ func UpdateSecretAndEncryptCreds(initial_run bool, config_struct config.ConfigSt
 			utils.HostsWithCurrentNodes(hostFileName, config_struct.ClusterDetails)
 			err := ansibleutils.UpdateWithTags(config_struct.ClusterDetails.SshUser, hostFileName, []string{"update_secret", "update_config"})
 			if err != nil {
-				log.Error.Println(err)
-				log.Error.Println("Unable to update config.yaml and .secret.txt on the other node")
-				panic(err)
+			        log.Error.Println(err)
+			        log.Error.Println("Unable to update config.yaml and .secret.txt on the other node")
+			        panic(err)
 			}
 		}
 	} else {
@@ -350,9 +358,9 @@ func UpdateSecretAndEncryptCreds(initial_run bool, config_struct config.ConfigSt
 		utils.HostsWithCurrentNodes(hostFileName, config_struct.ClusterDetails)
 		err := ansibleutils.UpdateWithTags(config_struct.ClusterDetails.SshUser, hostFileName, []string{"update_secret", "update_config"})
 		if err != nil {
-			log.Error.Println(err)
-			log.Error.Println("Unable to update config.yaml and .secret.txt on the other node")
-			panic(err)
+		        log.Error.Println(err)
+		        log.Error.Println("Unable to update config.yaml and .secret.txt on the other node")
+		        panic(err)
 		}
 	}
 
@@ -372,6 +380,7 @@ func UpdateSecretAndEncryptCreds(initial_run bool, config_struct config.ConfigSt
 //
 //	(bool): Bool value which says if there was a mismatch or not
 func OsCredsMismatch(currOsCred config.OsCredentials, prevOsCred config.OsCredentials) bool {
+	log.Info.Println(currOsCred, prevOsCred)
 	if (currOsCred.OsAdminUsername != prevOsCred.OsAdminUsername) || (currOsCred.OsAdminPassword != prevOsCred.OsAdminPassword) {
 		return true
 	}
@@ -414,8 +423,8 @@ func Encode(b []byte) string {
 
 // Input:
 //
-//	     text (string): String to be encrypted
-//		EncryptionSecret (string): EncryptionSecret to be used to encrypt the text
+//	text (string): String to be encrypted
+//	   EncryptionSecret (string): EncryptionSecret to be used to encrypt the text
 //
 // Description:
 //
@@ -423,8 +432,8 @@ func Encode(b []byte) string {
 //
 // Return:
 //
-//	     (string): Encrypted value of the text
-//		(error): Error if any
+//	(string): Encrypted value of the text
+//	   (error): Error if any
 func Encrypt(text, EncryptionSecret string) (string, error) {
 	block, err := aes.NewCipher([]byte(EncryptionSecret))
 	if err != nil {
@@ -464,8 +473,8 @@ func Decode(s string) ([]byte, error) {
 
 // Input:
 //
-//	     text (string): String to be decrypted
-//		EncryptionSecret (string): EncryptionSecret to be used for decryption
+//	text (string): String to be decrypted
+//	   EncryptionSecret (string): EncryptionSecret to be used for decryption
 //
 // Description:
 //
