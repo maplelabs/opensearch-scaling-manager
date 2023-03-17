@@ -297,6 +297,7 @@ func DecryptCredsAndInitializeOs(try int, master bool, prevConfig config.ConfigS
 			UpdateSecretAndEncryptCreds(false, configStruct)
 		}
 		prevConfig = configStruct
+		configStruct, _ = config.GetConfig()
 	}
 
 	if _, err = os.Stat(SecretFilepath); err == nil {

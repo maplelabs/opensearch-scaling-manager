@@ -220,7 +220,7 @@ func RerouteRetryFailed(ctx context.Context) (*osapi.Response, error) {
 func doRetry(ctx context.Context, request interface{}) (*osapi.Response, error) {
 	var resp *osapi.Response
 	var err error
-	for i := 0; i < 30; i++ {
+	for i := 0; i < 60; i++ {
 		switch request.(type) {
 		case osapi.IndexRequest:
 			resp, err = request.(osapi.IndexRequest).Do(ctx, osClient)
