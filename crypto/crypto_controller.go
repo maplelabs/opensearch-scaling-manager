@@ -380,7 +380,6 @@ func UpdateSecretAndEncryptCreds(initial_run bool, config_struct config.ConfigSt
 //
 //	(bool): Bool value which says if there was a mismatch or not
 func OsCredsMismatch(currOsCred config.OsCredentials, prevOsCred config.OsCredentials) bool {
-	log.Info.Println(currOsCred, prevOsCred)
 	if (currOsCred.OsAdminUsername != prevOsCred.OsAdminUsername) || (currOsCred.OsAdminPassword != prevOsCred.OsAdminPassword) {
 		return true
 	}
