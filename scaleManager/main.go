@@ -218,8 +218,6 @@ func fileWatch(previousConfigStruct config.ConfigStruct) {
 							configStruct, _ := config.GetConfig()
 							crypto.DecryptCredsAndInitializeOs(60, true, configStruct)
 							previousConfigStruct, _ = config.GetConfig()
-						} else {
-							log.Info.Println("FILE_EVENT encountered : Creds not updated")
 						}
 					} else {
 						current_secret := crypto.GetEncryptionSecret()
