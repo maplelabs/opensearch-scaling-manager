@@ -308,12 +308,13 @@ func DecryptCredsAndInitializeOs(try int, master bool, prevConfig config.ConfigS
 	osErr := osutils.InitializeOsClient(configStruct.ClusterDetails.OsCredentials.OsAdminUsername, configStruct.ClusterDetails.OsCredentials.OsAdminPassword)
 	if osErr != nil && try > 0 {
 		log.Error.Println("Retrying #", try, " on error: ", osErr)
+		log.Error.Println("Will retry until count # is zero")
 		time.Sleep(time.Duration(10) * time.Second)
 		DecryptCredsAndInitializeOs(try-1, master, prevConfig)
 	} else if osErr != nil {
 		log.Error.Println("Unable to connect to Opensearch even after maximum retries!!")
 		log.Error.Println("Please check the Opensearch service or recheck username/password and restart scaling manager...")
-		panic(err)
+		panic(osErr)
 	}
 
 }
