@@ -277,11 +277,14 @@ func UpdateEncryptedCred(initialRun bool, config_struct config.ConfigStruct) err
 // Input:
 //
 //	try (int): An integer which says the number of times this function has to be retried on any failure
+//	master (bool): Whether this node is master or not
+//	prevConfig (config.ConfigStruct): Configuration from the calling method
 //
 // Description:
 //
-//	Read the configuration file, get the decrypted Opensearch credentials and Initialize the Opensearch Client
-//	   This also retries for the number of times specified in the interval of 10 seconds if there is a failure
+//	Read the configuration file, check if there is any change from the config passed in the method
+//	Get the decrypted Opensearch credentials and Initialize the Opensearch Client
+//	This also retries for the number of times specified in the interval of 10 seconds if there is a failure
 //
 // Return:
 func DecryptCredsAndInitializeOs(try int, master bool, prevConfig config.ConfigStruct) {
