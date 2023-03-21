@@ -348,9 +348,9 @@ func UpdateSecretAndEncryptCreds(initial_run bool, config_struct config.ConfigSt
 			utils.HostsWithCurrentNodes(hostFileName, config_struct.ClusterDetails)
 			err := ansibleutils.UpdateWithTags(hostFileName, config_struct.ClusterDetails, []string{"update_secret", "update_config"})
 			if err != nil {
-			        log.Error.Println(err)
-			        log.Error.Println("Unable to update config.yaml and .secret.txt on the other node")
-			        panic(err)
+				log.Error.Println(err)
+				log.Error.Println("Unable to update config.yaml and .secret.txt on the other node")
+				panic(err)
 			}
 		}
 	} else {
@@ -363,9 +363,9 @@ func UpdateSecretAndEncryptCreds(initial_run bool, config_struct config.ConfigSt
 		utils.HostsWithCurrentNodes(hostFileName, config_struct.ClusterDetails)
 		err := ansibleutils.UpdateWithTags(hostFileName, config_struct.ClusterDetails, []string{"update_secret", "update_config"})
 		if err != nil {
-		        log.Error.Println(err)
-		        log.Error.Println("Unable to update config.yaml and .secret.txt on the other node")
-		        panic(err)
+			log.Error.Println(err)
+			log.Error.Println("Unable to update config.yaml and .secret.txt on the other node")
+			panic(err)
 		}
 	}
 
