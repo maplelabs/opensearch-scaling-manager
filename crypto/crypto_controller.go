@@ -242,7 +242,6 @@ func GetDecryptedCloudCreds(cloudCred *config.CloudCredentials) {
 
 // Input:
 //
-//	   initialRun (bool): A bool value which says if this function is called from init() or in between while the application is running
 //	config_struct (config.ConfigStruct): Config structure from the config.yaml
 //
 // Description:
@@ -252,7 +251,7 @@ func GetDecryptedCloudCreds(cloudCred *config.CloudCredentials) {
 // Return:
 //
 //	(error): Error if any while Updating the details
-func UpdateEncryptedCred(initialRun bool, config_struct config.ConfigStruct) error {
+func UpdateEncryptedCred(config_struct config.ConfigStruct) error {
 	OsCredErr := GetEncryptedOsCred(&config_struct.ClusterDetails.OsCredentials)
 	if OsCredErr != nil {
 		log.Panic.Println("Error getting the encrypted config struct : ", OsCredErr)
@@ -318,8 +317,10 @@ func DecryptCredsAndInitializeOs(try int, master bool, prevConfig config.ConfigS
 		log.Error.Println("Unable to connect to Opensearch even after maximum retries!!")
 		log.Error.Println("Please check the Opensearch service or recheck username/password and restart scaling manager...")
 		panic(osErr)
+	} else if master && osErr == nil {
+		// Broadcast config file once the client connection is successful
+		BroadCastConfig(configStruct.ClusterDetails)
 	}
-
 }
 
 // Input:
@@ -342,31 +343,14 @@ func UpdateSecretAndEncryptCreds(initial_run bool, config_struct config.ConfigSt
 	if initial_run {
 		if utils.CheckIfMaster(context.Background(), "") {
 			GenerateAndScrambleSecret()
-			UpdateEncryptedCred(initial_run, config_struct)
-			//ansible logic to copy the secret and config
-			hostFileName := "broadcast_hosts"
-			utils.HostsWithCurrentNodes(hostFileName, config_struct.ClusterDetails)
-			err := ansibleutils.UpdateWithTags(hostFileName, config_struct.ClusterDetails, []string{"update_secret", "update_config"})
-			if err != nil {
-				log.Error.Println(err)
-				log.Error.Println("Unable to update config.yaml and .secret.txt on the other node")
-				panic(err)
-			}
+			UpdateEncryptedCred(config_struct)
+			BroadCastConfig(config_struct.ClusterDetails)
 		}
 	} else {
 		GetDecryptedOsCreds(&config_struct.ClusterDetails.OsCredentials)
 		GetDecryptedCloudCreds(&config_struct.ClusterDetails.CloudCredentials)
 		GenerateAndScrambleSecret()
-		UpdateEncryptedCred(initial_run, config_struct)
-		//ansible logic to copy the secret and config
-		hostFileName := "broadcast_hosts"
-		utils.HostsWithCurrentNodes(hostFileName, config_struct.ClusterDetails)
-		err := ansibleutils.UpdateWithTags(hostFileName, config_struct.ClusterDetails, []string{"update_secret", "update_config"})
-		if err != nil {
-			log.Error.Println(err)
-			log.Error.Println("Unable to update config.yaml and .secret.txt on the other node")
-			panic(err)
-		}
+		UpdateEncryptedCred(config_struct)
 	}
 
 	return nil
@@ -658,4 +642,25 @@ func getScrambledOrOriginalSecret(secret string, scrambled bool) string {
 		}
 	}
 	return strings.Join(requiredArr, "")
+}
+
+// Input :
+//
+//	clusterDetails (config.ClusterDetails): Cluster details needed to create ansible host file broadcast_hosts
+//
+// Description :
+//
+//	Broadcasts the updated config.yaml to other data nodes in the cluster
+//
+// Output :
+func BroadCastConfig(clusterDetails config.ClusterDetails) {
+	//ansible logic to copy the secret and config
+	hostFileName := "broadcast_hosts"
+	utils.HostsWithCurrentNodes(hostFileName, clusterDetails)
+	err := ansibleutils.UpdateWithTags(hostFileName, clusterDetails, []string{"update_secret", "update_config"})
+	if err != nil {
+		log.Error.Println(err)
+		log.Error.Println("Unable to update config.yaml and .secret.txt on the other node")
+		panic(err)
+	}
 }

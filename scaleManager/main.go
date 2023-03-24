@@ -217,6 +217,7 @@ func fileWatch(previousConfigStruct config.ConfigStruct) {
 							crypto.UpdateSecretAndEncryptCreds(false, currentConfigStruct)
 							configStruct, _ := config.GetConfig()
 							crypto.DecryptCredsAndInitializeOs(60, true, configStruct)
+							crypto.BroadCastConfig(configStruct.ClusterDetails)
 							previousConfigStruct, _ = config.GetConfig()
 						}
 					} else {
