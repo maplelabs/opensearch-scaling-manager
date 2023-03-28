@@ -215,17 +215,19 @@ func fileWatch(previousConfigStruct config.ConfigStruct) {
 						if crypto.OsCredsMismatch(currOsCredentials, prevOsCredentials) || crypto.CloudCredsMismatch(currCloudCredentials, prevCloudCredentials) {
 							log.Info.Println("FILE_EVENT encountered : Creds updated")
 							crypto.UpdateSecretAndEncryptCreds(false, currentConfigStruct)
+							configStruct, _ := config.GetConfig()
+							crypto.DecryptCredsAndInitializeOs(60, true, configStruct)
+							crypto.BroadCastConfig(configStruct.ClusterDetails)
 							previousConfigStruct, _ = config.GetConfig()
-						} else {
-							log.Info.Println("FILE_EVENT encountered : Creds not updated")
 						}
 					} else {
 						current_secret := crypto.GetEncryptionSecret()
 						if crypto.EncryptionSecret != current_secret {
 							log.Info.Println("Change in Creds detected")
 							crypto.EncryptionSecret = current_secret
-							config_struct, _ := config.GetConfig()
-							crypto.DecryptCredsAndInitializeOs(config_struct)
+							configStruct, _ := config.GetConfig()
+							// Retry for 60 times in the interval of 10 secs if the connection fails
+							crypto.DecryptCredsAndInitializeOs(60, false, configStruct)
 						}
 					}
 				}

@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
+	"errors"
 	"github.com/maplelabs/opensearch-scaling-manager/logger"
 	"net/http"
-	"os"
 
 	opensearch "github.com/opensearch-project/opensearch-go"
 	osapi "github.com/opensearch-project/opensearch-go/opensearchapi"
@@ -49,7 +49,7 @@ func init() {
 //	Initialize the Opensearch client
 //
 // Return:
-func InitializeOsClient(username string, password string) {
+func InitializeOsClient(username string, password string) error {
 	var err error
 
 	osClient, err = opensearch.NewClient(opensearch.Config{
@@ -63,23 +63,24 @@ func InitializeOsClient(username string, password string) {
 	})
 	if err != nil {
 		log.Fatal.Println(err)
-		os.Exit(1)
+		return err
 	}
 
 	res, err := osClient.Ping()
 	if err != nil {
 		log.Fatal.Println(err)
-		os.Exit(1)
+		return err
 	}
 
 	if res.IsError() {
 		log.Fatal.Println("Unable to ping OpenSearch! Error: ", res.Status())
-		os.Exit(1)
+		return errors.New(res.Status())
 	}
 
 	log.Info.Println("OpenSearch connection successful: ", res)
 
 	CheckIfIndexExists(context.Background())
+	return nil
 
 }
 

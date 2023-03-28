@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"github.com/maplelabs/opensearch-scaling-manager/logger"
 	"github.com/maplelabs/opensearch-scaling-manager/config"
+	"github.com/maplelabs/opensearch-scaling-manager/logger"
 	osutils "github.com/maplelabs/opensearch-scaling-manager/opensearchUtils"
 	"hash/fnv"
 	"os"
@@ -46,7 +46,8 @@ func CheckIfMaster(ctx context.Context, nodeId string) bool {
 	decodeErr := json.NewDecoder(clusterState.Body).Decode(&clusterStateInterface)
 	if decodeErr != nil {
 		log.Panic.Println("decode Error: ", decodeErr)
-		panic(err)
+		log.Error.Println("Unable to get the master node!!")
+		panic(decodeErr)
 	}
 
 	//Parsing interface to get the id of the master node

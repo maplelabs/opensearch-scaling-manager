@@ -21,7 +21,17 @@ var EncryptionSecret string
 var seed = time.Now().Unix()
 var SecretFilepath = ".secret.txt"
 
-// Initializing logger module
+// Input:
+//
+// Description:
+//
+//	Initializes Crypto module
+//	   Reads the config.yaml file, if it is a fresh install of scaling manager, the SecretFilepath won't be present.
+//	   If present, it uses the file to decrypt the credentials present in config.yaml
+//	   It calls DecryptCredsAndInitializeOs to Initialize the Opensearch client with one try
+//	   Then Updates the Secret file, and ecrypted credentials into config.yaml
+//
+// Return:
 func init() {
 	log.Init("logger")
 	log.Info.Println("Crypto module initiated")
@@ -31,20 +41,28 @@ func init() {
 		log.Error.Println("Error validating config file", err)
 		panic(err)
 	}
+
+	DecryptCredsAndInitializeOs(1, false, configStruct)
+
 	if _, err = os.Stat(SecretFilepath); err == nil {
-		EncryptionSecret = GetEncryptionSecret()
 		GetDecryptedOsCreds(&configStruct.ClusterDetails.OsCredentials)
 		GetDecryptedCloudCreds(&configStruct.ClusterDetails.CloudCredentials)
 	}
 
-	osutils.InitializeOsClient(configStruct.ClusterDetails.OsCredentials.OsAdminUsername, configStruct.ClusterDetails.OsCredentials.OsAdminPassword)
 	UpdateSecretAndEncryptCreds(true, configStruct)
 }
 
 // bytes is used when creating ciphers for the string
 var bytes = []byte{35, 46, 57, 24, 85, 35, 24, 74, 87, 35, 88, 98, 66, 32, 14, 05}
 
-// Generate a random string of length 16
+// Input:
+//
+// Description:
+//      Generate a random string of length 16
+//
+// Return:
+//      (string): Returns the random string generated as password
+
 func GeneratePassword() string {
 	mrand.Seed(time.Now().UnixNano())
 	digits := "0123456789"
@@ -66,6 +84,13 @@ func GeneratePassword() string {
 	return str
 }
 
+// Input:
+//
+// Description:
+//
+//	Scrambles the EncryptionSecret to store in SecretFilepath
+//
+// Return:
 func GenerateAndScrambleSecret() {
 	EncryptionSecret = GeneratePassword()
 	f, err := os.Create(SecretFilepath)
@@ -82,6 +107,15 @@ func GenerateAndScrambleSecret() {
 	}
 }
 
+// Input:
+//
+// Description:
+//
+//	Read the EncryptionSecret from SecretFilepath, decode the scrmabled secret to original secret and return it
+//
+// Return:
+//
+//	(string): Returns the EncryptionSecret
 func GetEncryptionSecret() string {
 	data, err := os.ReadFile(SecretFilepath)
 	if err != nil {
@@ -96,6 +130,17 @@ func GetEncryptionSecret() string {
 	return getScrambledOrOriginalSecret(string(decoded_data), false)
 }
 
+// Input:
+//
+//	osCred (*config.OsCredentials): Pointer to the Opensearch credentials from the config struct
+//
+// Description:
+//
+//	Encrypt the Opensearch Credentials passed as a pointer variable
+//
+// Return:
+//
+//	(error): Error if any while Encrypting
 func GetEncryptedOsCred(osCred *config.OsCredentials) error {
 	var err error
 
@@ -112,6 +157,17 @@ func GetEncryptedOsCred(osCred *config.OsCredentials) error {
 	return nil
 }
 
+// Input:
+//
+//	cloudCred (*config.CloudCredentials): Pointer to the Cloud credentials from the config struct
+//
+// Description:
+//
+//	Encrypt the Cloud Credentials passed as a pointer variable
+//
+// Return:
+//
+//	(error): Error if any while Encrypting
 func GetEncryptedCloudCred(cloudCred *config.CloudCredentials) error {
 	var err error
 
@@ -133,6 +189,15 @@ func GetEncryptedCloudCred(cloudCred *config.CloudCredentials) error {
 	return nil
 }
 
+// Input:
+//
+//	osCred (*config.OsCredentials): Pointer to the Opensearch credentials from the config struct
+//
+// Description:
+//
+//	Decrypt the Opensearch Credentials passed as a pointer variable
+//
+// Return:
 func GetDecryptedOsCreds(osCred *config.OsCredentials) {
 
 	os_admin_username := GetDecryptedData(osCred.OsAdminUsername)
@@ -147,6 +212,15 @@ func GetDecryptedOsCreds(osCred *config.OsCredentials) {
 
 }
 
+// Input:
+//
+//	cloudCred (*config.CloudCredentials): Pointer to the Cloud credentials from the config struct
+//
+// Description:
+//
+//	Decrypt the Cloud Credentials passed as a pointer variable
+//
+// Return:
 func GetDecryptedCloudCreds(cloudCred *config.CloudCredentials) {
 
 	secret_key := GetDecryptedData(cloudCred.SecretKey)
@@ -166,8 +240,18 @@ func GetDecryptedCloudCreds(cloudCred *config.CloudCredentials) {
 
 }
 
-func UpdateEncryptedCred(initialRun bool, config_struct config.ConfigStruct) error {
-	copyCreds := config_struct.ClusterDetails.OsCredentials
+// Input:
+//
+//	config_struct (config.ConfigStruct): Config structure from the config.yaml
+//
+// Description:
+//
+//	Encrypt the credentials and update the configuration file [config.yaml] and also Initialize the Opensearch client with new credentials
+//
+// Return:
+//
+//	(error): Error if any while Updating the details
+func UpdateEncryptedCred(config_struct config.ConfigStruct) error {
 	OsCredErr := GetEncryptedOsCred(&config_struct.ClusterDetails.OsCredentials)
 	if OsCredErr != nil {
 		log.Panic.Println("Error getting the encrypted config struct : ", OsCredErr)
@@ -186,53 +270,104 @@ func UpdateEncryptedCred(initialRun bool, config_struct config.ConfigStruct) err
 		panic(err)
 	}
 
-	// initialize new os client connection with the updated creds
-	if !initialRun {
-		osutils.InitializeOsClient(copyCreds.OsAdminUsername, copyCreds.OsAdminPassword)
-	}
 	return nil
 }
 
-func DecryptCredsAndInitializeOs(config_struct config.ConfigStruct) {
-	GetDecryptedOsCreds(&config_struct.ClusterDetails.OsCredentials)
-	osutils.InitializeOsClient(config_struct.ClusterDetails.OsCredentials.OsAdminUsername, config_struct.ClusterDetails.OsCredentials.OsAdminPassword)
+// Input:
+//
+//	try (int): An integer which says the number of times this function has to be retried on any failure
+//	master (bool): Whether this node is master or not
+//	prevConfig (config.ConfigStruct): Configuration from the calling method
+//
+// Description:
+//
+//	Read the configuration file, check if there is any change from the config passed in the method
+//	Get the decrypted Opensearch credentials and Initialize the Opensearch Client
+//	This also retries for the number of times specified in the interval of 10 seconds if there is a failure
+//
+// Return:
+func DecryptCredsAndInitializeOs(try int, master bool, prevConfig config.ConfigStruct) {
+	configStruct, err := config.GetConfig()
+	if err != nil {
+		log.Error.Println("Error validating config file", err)
+		panic(err)
+	}
+
+	if master {
+		if OsCredsMismatch(configStruct.ClusterDetails.OsCredentials, prevConfig.ClusterDetails.OsCredentials) || CloudCredsMismatch(configStruct.ClusterDetails.CloudCredentials, prevConfig.ClusterDetails.CloudCredentials) {
+			log.Info.Println("Detected creds change while Retyring OS Connection")
+			UpdateSecretAndEncryptCreds(false, configStruct)
+		}
+		prevConfig = configStruct
+		configStruct, _ = config.GetConfig()
+	}
+
+	if _, err = os.Stat(SecretFilepath); err == nil {
+		EncryptionSecret = GetEncryptionSecret()
+		GetDecryptedOsCreds(&configStruct.ClusterDetails.OsCredentials)
+	}
+
+	osErr := osutils.InitializeOsClient(configStruct.ClusterDetails.OsCredentials.OsAdminUsername, configStruct.ClusterDetails.OsCredentials.OsAdminPassword)
+	if osErr != nil && try > 0 {
+		log.Error.Println("Retrying #", try, " on error: ", osErr)
+		log.Error.Println("Will retry until count # is zero")
+		time.Sleep(time.Duration(10) * time.Second)
+		DecryptCredsAndInitializeOs(try-1, master, prevConfig)
+	} else if osErr != nil {
+		log.Error.Println("Unable to connect to Opensearch even after maximum retries!!")
+		log.Error.Println("Please check the Opensearch service or recheck username/password and restart scaling manager...")
+		panic(osErr)
+	} else if master && osErr == nil {
+		// Broadcast config file once the client connection is successful
+		BroadCastConfig(configStruct.ClusterDetails)
+	}
 }
 
+// Input:
+//
+//	initial_run (bool): A bool value which says if this function is called from init() or in between while the application is running
+//	config_struct (config.ConfigStruct): Config structure from the config.yaml
+//
+// Description:
+//
+//	If it is called by init(), i.e., when initial_run = true, it checks if the current node is master, if yes,
+//	It regenerates the secret file, updates the encrypted credentials
+//	And populates the secret file and updated config file across all the other nodes in the clusteer using ansible script
+//	If not called from init(), it will be called if it is a master node. In this case, it generated the new secret file, updates the encrypted credentials.
+//	Populates this information to all the other nodes in the cluster.
+//
+// Return:
+//
+//	(error): Error if any
 func UpdateSecretAndEncryptCreds(initial_run bool, config_struct config.ConfigStruct) error {
 	if initial_run {
 		if utils.CheckIfMaster(context.Background(), "") {
 			GenerateAndScrambleSecret()
-			UpdateEncryptedCred(initial_run, config_struct)
-			//ansible logic to copy the secret and config
-			hostFileName := "broadcast_hosts"
-			utils.HostsWithCurrentNodes(hostFileName, config_struct.ClusterDetails)
-			err := ansibleutils.UpdateWithTags(hostFileName, config_struct.ClusterDetails, []string{"update_secret", "update_config"})
-			if err != nil {
-				log.Error.Println(err)
-				log.Error.Println("Unable to update config.yaml and .secret.txt on the other node")
-				panic(err)
-			}
+			UpdateEncryptedCred(config_struct)
+			BroadCastConfig(config_struct.ClusterDetails)
 		}
 	} else {
 		GetDecryptedOsCreds(&config_struct.ClusterDetails.OsCredentials)
 		GetDecryptedCloudCreds(&config_struct.ClusterDetails.CloudCredentials)
 		GenerateAndScrambleSecret()
-		UpdateEncryptedCred(initial_run, config_struct)
-		//ansible logic to copy the secret and config
-		hostFileName := "broadcast_hosts"
-		utils.HostsWithCurrentNodes(hostFileName, config_struct.ClusterDetails)
-		err := ansibleutils.UpdateWithTags(hostFileName, config_struct.ClusterDetails, []string{"update_secret", "update_config"})
-		if err != nil {
-			log.Error.Println(err)
-			log.Error.Println("Unable to update config.yaml and .secret.txt on the other node")
-			panic(err)
-		}
-
+		UpdateEncryptedCred(config_struct)
 	}
 
 	return nil
 }
 
+// Input:
+//
+//	currOsCred (config.OsCredentials): Current Opensearch credentials in the config.yaml file
+//	prevOsCred (config.OsCredentials): Previous Opensearch credentials
+//
+// Description:
+//
+//	Checks if there is a mismatch in the previous and current credentials
+//
+// Return:
+//
+//	(bool): Bool value which says if there was a mismatch or not
 func OsCredsMismatch(currOsCred config.OsCredentials, prevOsCred config.OsCredentials) bool {
 	if (currOsCred.OsAdminUsername != prevOsCred.OsAdminUsername) || (currOsCred.OsAdminPassword != prevOsCred.OsAdminPassword) {
 		return true
@@ -240,6 +375,18 @@ func OsCredsMismatch(currOsCred config.OsCredentials, prevOsCred config.OsCreden
 	return false
 }
 
+// Input:
+//
+//	currCloudCred (config.CloudCredentials): Current Cloud credentials in the config.yaml file
+//	prevCloudCred (config.CloudCredentials): Previous Cloud credentials
+//
+// Description:
+//
+//	Checks if there is a mismatch in the previous and current credentials
+//
+// Return:
+//
+//	(bool): Bool value which says if there was a mismatch or not
 func CloudCredsMismatch(currCloudCred config.CloudCredentials, prevCloudCred config.CloudCredentials) bool {
 	if (currCloudCred.SecretKey != prevCloudCred.SecretKey) || (currCloudCred.AccessKey != prevCloudCred.AccessKey) || (currCloudCred.RoleArn != prevCloudCred.RoleArn) {
 		return true
@@ -247,12 +394,34 @@ func CloudCredsMismatch(currCloudCred config.CloudCredentials, prevCloudCred con
 	return false
 }
 
-// Encode the given byte value
+// Input:
+//
+//	b ([]byte): Byte value to be encoded to string
+//
+// Description:
+//
+//	Encode the given byte value into string
+//
+// Return:
+//
+//	(string): Encoded value of byte as string
 func Encode(b []byte) string {
 	return base32.StdEncoding.EncodeToString(b)
 }
 
-// Encrypt method is to encrypt or hide any classified text
+// Input:
+//
+//	text (string): String to be encrypted
+//	   EncryptionSecret (string): EncryptionSecret to be used to encrypt the text
+//
+// Description:
+//
+//	To encrypt or hide any classified text using the EncryptionSecret
+//
+// Return:
+//
+//	(string): Encrypted value of the text
+//	   (error): Error if any
 func Encrypt(text, EncryptionSecret string) (string, error) {
 	block, err := aes.NewCipher([]byte(EncryptionSecret))
 	if err != nil {
@@ -265,7 +434,18 @@ func Encrypt(text, EncryptionSecret string) (string, error) {
 	return Encode(cipherText), nil
 }
 
-// Decode the given string
+// Input:
+//
+//	s (string): String to be decoded
+//
+// Description:
+//
+//	Decode the given string
+//
+// Return:
+//
+//	([]byte): Decoded value as byte
+//	(error): Error if any
 func Decode(s string) ([]byte, error) {
 	data, err := base32.StdEncoding.DecodeString(s)
 	if err != nil {
@@ -279,7 +459,19 @@ func Decode(s string) ([]byte, error) {
 	return data, nil
 }
 
-// Decrypt method is to extract back the encrypted text
+// Input:
+//
+//	text (string): String to be decrypted
+//	   EncryptionSecret (string): EncryptionSecret to be used for decryption
+//
+// Description:
+//
+//	Decrypt method is to extract back the encrypted text
+//
+// Return:
+//
+//	([]byte): Decrypted text
+//	(error): Error if any
 func Decrypt(text, EncryptionSecret string) (string, error) {
 	block, err := aes.NewCipher([]byte(EncryptionSecret))
 	if err != nil {
@@ -296,9 +488,19 @@ func Decrypt(text, EncryptionSecret string) (string, error) {
 	return string(plainText), nil
 }
 
-// Creates an encrypted string : performs AES encryption using the defined secret
-// and return base32 encoded string. Also checks if the encrypted string is able
-// to be decrypted used the same secret.
+// Input :
+//
+//	toBeEncrypted (string): string to be encrypted
+//
+// Description :
+//
+//	Creates an encrypted string : performs AES encryption using the defined secret
+//	and return base32 encoded string. Also checks if the encrypted string is able
+//	to be decrypted used the same secret.
+//
+// Output :
+//
+//	(string, error) : Encrypted string and error if any
 func GetEncryptedData(toBeEncrypted string) (string, error) {
 	encText, err := Encrypt(toBeEncrypted, EncryptionSecret)
 	if err != nil {
@@ -313,7 +515,17 @@ func GetEncryptedData(toBeEncrypted string) (string, error) {
 	return encText, nil
 }
 
-// Return the decrypted string of the given encrypted string
+// Input :
+//
+//	encryptedString (string): string to be decrypted
+//
+// Description :
+//
+//	Return the decrypted string of the given encrypted string
+//
+// Output :
+//
+//	(string) : Decrypted string
 func GetDecryptedData(encryptedString string) string {
 	decrypted_txt, err := Decrypt(encryptedString, EncryptionSecret)
 	if err != nil {
@@ -323,7 +535,17 @@ func GetDecryptedData(encryptedString string) string {
 	return decrypted_txt
 }
 
-// Converts a 16 len string to 4*4 matrix
+// Input :
+//
+//	str (string): string to be converted to matrix
+//
+// Description :
+//
+//	Converts a 16 len string to 4*4 matrix
+//
+// Output :
+//
+//	([4][4]string) : A matrix derived from the given string
 func stringToMatrix(str string) [4][4]string {
 	var matrix [4][4]string
 	for i := 0; i < 4; i++ {
@@ -334,7 +556,17 @@ func stringToMatrix(str string) [4][4]string {
 	return matrix
 }
 
-// Returns the transpose of the given matrix
+// Input :
+//
+//	matrix ([4][4]string): Matrix to reverse
+//
+// Description :
+//
+//	Returns the transpose of the given matrix
+//
+// Output :
+//
+//	([4][4]string) : Updated matrix
 func transpose(matrix [4][4]string) [4][4]string {
 	var transposedMatrix [4][4]string
 	for i := 0; i < 4; i++ {
@@ -345,7 +577,17 @@ func transpose(matrix [4][4]string) [4][4]string {
 	return transposedMatrix
 }
 
-// Returns the matrix with interchanged rows
+// Input :
+//
+//	matrix ([4][4]string): Matrix to reverse
+//
+// Description :
+//
+//	Returns the matrix with interchanged rows
+//
+// Output :
+//
+//	([4][4]string) : Updated matrix
 func reverse(matrix [4][4]string) [4][4]string {
 	for i, j := 0, len(matrix)-1; i < j; i, j = i+1, j-1 {
 		matrix[i], matrix[j] = matrix[j], matrix[i]
@@ -353,7 +595,17 @@ func reverse(matrix [4][4]string) [4][4]string {
 	return matrix
 }
 
-// Returns the matrix with intergchanged diagonal values
+// Input :
+//
+//	matrix ([4][4]string): Matrix to reverse
+//
+// Description :
+//
+//	Returns the matrix with intergchanged diagonal values
+//
+// Output :
+//
+//	([4][4]string) : Reversed matrix
 func reverse_diag(matrix [4][4]string) [4][4]string {
 	for i := 0; i < 4; i++ {
 		temp := matrix[i][i]
@@ -364,15 +616,18 @@ func reverse_diag(matrix [4][4]string) [4][4]string {
 }
 
 // Input :
-// secret (string) : The string which needs to be scrambled or unscrambled
-// scrambled (boolean) : True for scramble, false for unscramble
+//
+//	secret (string) : The string which needs to be scrambled or unscrambled
+//	scrambled (boolean) : True for scramble, false for unscramble
 //
 // Description :
-// This function scrambles and unscrambles the given string by converting it
-// into matrix and interchanging the values in it.
+//
+//	This function scrambles and unscrambles the given string by converting it
+//	into matrix and interchanging the values in it.
 //
 // Output :
-// string : scrambled or unscrambled string as per the requirement
+//
+//	string : scrambled or unscrambled string as per the requirement
 func getScrambledOrOriginalSecret(secret string, scrambled bool) string {
 	var requiredArr []string
 	matrix := stringToMatrix(secret)
@@ -387,4 +642,25 @@ func getScrambledOrOriginalSecret(secret string, scrambled bool) string {
 		}
 	}
 	return strings.Join(requiredArr, "")
+}
+
+// Input :
+//
+//	clusterDetails (config.ClusterDetails): Cluster details needed to create ansible host file broadcast_hosts
+//
+// Description :
+//
+//	Broadcasts the updated config.yaml to other data nodes in the cluster
+//
+// Output :
+func BroadCastConfig(clusterDetails config.ClusterDetails) {
+	//ansible logic to copy the secret and config
+	hostFileName := "broadcast_hosts"
+	utils.HostsWithCurrentNodes(hostFileName, clusterDetails)
+	err := ansibleutils.UpdateWithTags(hostFileName, clusterDetails, []string{"update_secret", "update_config"})
+	if err != nil {
+		log.Error.Println(err)
+		log.Error.Println("Unable to update config.yaml and .secret.txt on the other node")
+		panic(err)
+	}
 }

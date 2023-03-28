@@ -3,6 +3,7 @@ package osutils
 import (
 	"bytes"
 	"context"
+	"reflect"
 	"strings"
 	"time"
 
@@ -22,12 +23,12 @@ import (
 //
 //	(*osapi.Response, error): Returns the api response and error if any
 func IndexMetrics(ctx context.Context, jsonDoc []byte) (*osapi.Response, error) {
-	return osapi.IndexRequest{
+	return doRetry(ctx, osapi.IndexRequest{
 		Index:        IndexName,
 		DocumentType: "_doc",
 		Body:         bytes.NewReader(jsonDoc),
 		Refresh:      "wait_for",
-	}.Do(ctx, osClient)
+	})
 }
 
 // Input:
@@ -42,7 +43,7 @@ func IndexMetrics(ctx context.Context, jsonDoc []byte) (*osapi.Response, error) 
 //
 //	(*osapi.Response, error): Returns the api response and error if any
 func GetClusterStats(ctx context.Context) (*osapi.Response, error) {
-	return osapi.ClusterStatsRequest{}.Do(ctx, osClient)
+	return doRetry(ctx, osapi.ClusterStatsRequest{})
 }
 
 // Input:
@@ -57,11 +58,11 @@ func GetClusterStats(ctx context.Context) (*osapi.Response, error) {
 //
 //	(*osapi.Response, error): Returns the api response and error if any
 func GetClusterHealth(ctx context.Context, WaitForShards *bool) (*osapi.Response, error) {
-	return osapi.ClusterHealthRequest{
+	return doRetry(ctx, osapi.ClusterHealthRequest{
 		WaitForNoInitializingShards: WaitForShards,
 		WaitForNoRelocatingShards:   WaitForShards,
 		Timeout:                     time.Duration(90 * time.Second),
-	}.Do(ctx, osClient)
+	})
 }
 
 // Input:
@@ -76,7 +77,7 @@ func GetClusterHealth(ctx context.Context, WaitForShards *bool) (*osapi.Response
 //
 //	(*osapi.Response, error): Returns the api response and error if any
 func GetClusterState(ctx context.Context) (*osapi.Response, error) {
-	return osapi.ClusterStateRequest{}.Do(ctx, osClient)
+	return doRetry(ctx, osapi.ClusterStateRequest{})
 }
 
 // Input:
@@ -93,11 +94,11 @@ func GetClusterState(ctx context.Context) (*osapi.Response, error) {
 //
 //	(*osapi.Response, error): Returns the api response and error if any
 func GetNodeStats(ctx context.Context, nodes []string, metrics []string) (*osapi.Response, error) {
-	return osapi.NodesStatsRequest{
+	return doRetry(ctx, osapi.NodesStatsRequest{
 		Pretty: true,
 		NodeID: nodes,
 		Metric: metrics,
-	}.Do(ctx, osClient)
+	})
 }
 
 // Input:
@@ -113,10 +114,10 @@ func GetNodeStats(ctx context.Context, nodes []string, metrics []string) (*osapi
 //
 //	(*osapi.Response, error): Returns the api response and error if any
 func CatAllocation(ctx context.Context, nodes []string) (*osapi.Response, error) {
-	return osapi.CatAllocationRequest{
+	return doRetry(ctx, osapi.CatAllocationRequest{
 		Pretty: true,
 		NodeID: nodes,
-	}.Do(ctx, osClient)
+	})
 }
 
 // Input:
@@ -132,10 +133,10 @@ func CatAllocation(ctx context.Context, nodes []string) (*osapi.Response, error)
 //
 //	(*osapi.Response, error): Returns the api response and error if any
 func SearchQuery(ctx context.Context, jsonQuery []byte) (*osapi.Response, error) {
-	return osapi.SearchRequest{
+	return doRetry(ctx, osapi.SearchRequest{
 		Index: []string{IndexName},
 		Body:  bytes.NewReader(jsonQuery),
-	}.Do(ctx, osClient)
+	})
 }
 
 // Input:
@@ -151,10 +152,10 @@ func SearchQuery(ctx context.Context, jsonQuery []byte) (*osapi.Response, error)
 //
 //	(*osapi.Response, error): Returns the api response and error if any
 func SearchDoc(ctx context.Context, docId string) (*osapi.Response, error) {
-	return osapi.GetRequest{
+	return doRetry(ctx, osapi.GetRequest{
 		Index:      IndexName,
 		DocumentID: docId,
-	}.Do(ctx, osClient)
+	})
 }
 
 // Input:
@@ -171,12 +172,12 @@ func SearchDoc(ctx context.Context, docId string) (*osapi.Response, error) {
 //
 //	(*osapi.Response, error): Returns the api response and error if any
 func UpdateDoc(ctx context.Context, docId string, content string) (*osapi.Response, error) {
-	return osapi.IndexRequest{
+	return doRetry(ctx, osapi.IndexRequest{
 		Index:      IndexName,
 		DocumentID: docId,
 		Body:       strings.NewReader(content),
 		Refresh:    "wait_for",
-	}.Do(ctx, osClient)
+	})
 }
 
 // Input:
@@ -192,10 +193,10 @@ func UpdateDoc(ctx context.Context, docId string, content string) (*osapi.Respon
 //
 //	(*osapi.Response, error): Returns the api response and error if any
 func DeleteWithQuery(ctx context.Context, jsonQuery []byte) (*osapi.Response, error) {
-	return osapi.DeleteByQueryRequest{
+	return doRetry(ctx, osapi.DeleteByQueryRequest{
 		Index: []string{IndexName},
 		Body:  bytes.NewReader(jsonQuery),
-	}.Do(ctx, osClient)
+	})
 }
 
 // Input:
@@ -211,7 +212,42 @@ func DeleteWithQuery(ctx context.Context, jsonQuery []byte) (*osapi.Response, er
 //	(*osapi.Response, error): Returns the api response and error if any
 func RerouteRetryFailed(ctx context.Context) (*osapi.Response, error) {
 	retry := true
-	return osapi.ClusterRerouteRequest{
+	return doRetry(ctx, osapi.ClusterRerouteRequest{
 		RetryFailed: &retry,
-	}.Do(ctx, osClient)
+	})
+}
+
+func doRetry(ctx context.Context, request interface{}) (*osapi.Response, error) {
+	var resp *osapi.Response
+	var err error
+	for i := 0; i < 60; i++ {
+		switch request.(type) {
+		case osapi.IndexRequest:
+			resp, err = request.(osapi.IndexRequest).Do(ctx, osClient)
+		case osapi.ClusterStatsRequest:
+			resp, err = request.(osapi.ClusterStatsRequest).Do(ctx, osClient)
+		case osapi.ClusterHealthRequest:
+			resp, err = request.(osapi.ClusterHealthRequest).Do(ctx, osClient)
+		case osapi.ClusterStateRequest:
+			resp, err = request.(osapi.ClusterStateRequest).Do(ctx, osClient)
+		case osapi.NodesStatsRequest:
+			resp, err = request.(osapi.NodesStatsRequest).Do(ctx, osClient)
+		case osapi.CatAllocationRequest:
+			resp, err = request.(osapi.CatAllocationRequest).Do(ctx, osClient)
+		case osapi.SearchRequest:
+			resp, err = request.(osapi.SearchRequest).Do(ctx, osClient)
+		case osapi.GetRequest:
+			resp, err = request.(osapi.GetRequest).Do(ctx, osClient)
+		case osapi.DeleteByQueryRequest:
+			resp, err = request.(osapi.DeleteByQueryRequest).Do(ctx, osClient)
+		case osapi.ClusterRerouteRequest:
+			resp, err = request.(osapi.ClusterRerouteRequest).Do(ctx, osClient)
+		}
+		if err == nil && resp.StatusCode < 400 {
+			break
+		}
+		log.Error.Println("Retrying #", i+1, reflect.TypeOf(request), " the OS API due to the error: ", resp.Status(), err)
+		time.Sleep(time.Duration(10) * time.Second)
+	}
+	return resp, err
 }
