@@ -142,6 +142,12 @@ func TerminateInstance(privateIp string, cred config.CloudCredentials) error {
 		return descErr
 	}
 
+	if len(describeResult.Reservations) == 0 || len(describeResult.Reservations[0].Instances) == 0 {
+		log.Error.Println("The result is empty. Couldn't find the instance with the given private ip.")
+		descErr = errors.New("Couldn't find the instance with the given private ip")
+		return descErr
+	}
+
 	instanceId := *describeResult.Reservations[0].Instances[0].InstanceId
 
 	log.Info.Println("Terminating instance with ID: ", instanceId)
