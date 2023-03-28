@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/maplelabs/opensearch-scaling-manager/config"
+	"errors"
 )
 
 // Input:
@@ -139,6 +140,12 @@ func TerminateInstance(privateIp string, cred config.CloudCredentials) error {
 
 	if descErr != nil {
 		log.Info.Println("Could not get the description of instance", descErr)
+		return descErr
+	}
+
+	if len(describeResult.Reservations) == 0 || len(describeResult.Reservations[0].Instances) == 0 {
+		log.Error.Println("The result is empty. Couldn't find the instance with the given private ip.")
+		descErr = errors.New("Couldn't find the instance with the given private ip")
 		return descErr
 	}
 
