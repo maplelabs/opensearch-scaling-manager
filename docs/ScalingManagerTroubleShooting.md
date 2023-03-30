@@ -1,11 +1,12 @@
 # Scaling Manager Trouble Shooting Guide
 
 - [Scaling Manager Trouble Shooting Guide](#scaling-manager-trouble-shooting-guide)
-  - [Scenario 1](#scenario-1)
-  - [Scenario 2](#scenario-2)
-  - [Scenario 3](#scenario-3)
-  - [Scenario 4](#scenario-4)
-  - [Scenario 5](#scenario-5)
+  * [Scenario 1](#scenario-1)
+  * [Scenario 2](#scenario-2)
+  * [Scenario 3](#scenario-3)
+  * [Scenario 4](#scenario-4)
+  * [Scenario 5](#scenario-5)
+  * [Scenario 6](#scenario-6)
 
 
 ## Scenario 1
@@ -170,3 +171,13 @@ Node will not be added due to the security configuration.
 **Explanation and Solution to resolve**
 
 Please go back and check if the wild card is enabled on configuration of CN on all the node.
+
+
+
+## Scenario 6
+
+Successful task record/message may not be indexed into Elasticsearch. 
+
+**Explanation and Solution to resolve**
+
+This may happen when the node is shutdown during the process of Scale_up/Scale_down and the instance was terminated/added, before this message is indexed to OpenSearch. There is a possibility that this record might not be indexed but the Scale_up/Scale_down was successful. The next time when scaling manager is started, it will try to terminate that instance which has already been terminated or add the instance which got added newly.

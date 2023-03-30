@@ -57,29 +57,6 @@ master_node_ip = IP address of master node,
 os_user = Appropriate username,
 os_pass = Appropriate password
 
-**Build, Pack**
-
-In case to use password based authentication, Use the following command
-
-```
-sudo ansible-playbook -i inventory.yaml install_scaling_manager.yaml --tags "build_and_pack" -kK
-```
-
--kK is used for password authentication
-
-In case to use key based authentication, Use the following command
-
-```
-sudo ansible-playbook -i inventory.yaml install_scaling_manager.yaml --tags "update_pem" --key-file USERPEMFILEPATH.pem -e pem_path="user-dev-aws-ssh.pem"
-```
-
-USERPEMFILEPATH = Please provide appropriate pem file path here.
-
-Key based and password based commands does the same work but the way you do is different. You can use either of the commands to execute.
-
-1. In password based authentication you should mention the credentials through which the command executes.
-2. In key based authentication you can specify the pem file path which has all the credentials so that you need not mention the credentials in command.
-
 **Installation**
 
 Password based authentication command 
