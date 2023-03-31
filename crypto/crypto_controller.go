@@ -5,15 +5,16 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/base32"
+	mrand "math/rand"
+	"os"
+	"strings"
+	"time"
+
 	ansibleutils "github.com/maplelabs/opensearch-scaling-manager/ansible_scripts"
 	"github.com/maplelabs/opensearch-scaling-manager/config"
 	"github.com/maplelabs/opensearch-scaling-manager/logger"
 	osutils "github.com/maplelabs/opensearch-scaling-manager/opensearchUtils"
 	utils "github.com/maplelabs/opensearch-scaling-manager/utilities"
-	mrand "math/rand"
-	"os"
-	"strings"
-	"time"
 )
 
 var log = new(logger.LOG)
@@ -21,11 +22,17 @@ var EncryptionSecret string
 var seed = time.Now().Unix()
 var SecretFilepath = ".secret.txt"
 
-// Initializing logger module
 func init() {
 	log.Init("logger")
 	log.Info.Println("Crypto module initiated")
+
 	mrand.Seed(seed)
+	configStruct := parseConfig()
+
+	osutils.InitializeOsClient(configStruct.ClusterDetails.OsCredentials.OsAdminUsername, configStruct.ClusterDetails.OsCredentials.OsAdminPassword)
+}
+
+func parseConfig() config.ConfigStruct {
 	configStruct, err := config.GetConfig()
 	if err != nil {
 		log.Error.Println("Error validating config file", err)
@@ -36,8 +43,12 @@ func init() {
 		GetDecryptedOsCreds(&configStruct.ClusterDetails.OsCredentials)
 		GetDecryptedCloudCreds(&configStruct.ClusterDetails.CloudCredentials)
 	}
+	return configStruct
+}
 
-	osutils.InitializeOsClient(configStruct.ClusterDetails.OsCredentials.OsAdminUsername, configStruct.ClusterDetails.OsCredentials.OsAdminPassword)
+// Initializing logger module
+func Initialize() {
+	configStruct := parseConfig()
 	UpdateSecretAndEncryptCreds(true, configStruct)
 }
 
@@ -125,11 +136,6 @@ func GetEncryptedCloudCred(cloudCred *config.CloudCredentials) error {
 		return err
 	}
 
-	cloudCred.RoleArn, err = GetEncryptedData(cloudCred.RoleArn)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -157,11 +163,6 @@ func GetDecryptedCloudCreds(cloudCred *config.CloudCredentials) {
 	access_key := GetDecryptedData(cloudCred.AccessKey)
 	if access_key != "" {
 		cloudCred.AccessKey = access_key
-	}
-
-	role_arn := GetDecryptedData(cloudCred.RoleArn)
-	if role_arn != "" {
-		cloudCred.RoleArn = role_arn
 	}
 
 }
@@ -206,7 +207,7 @@ func UpdateSecretAndEncryptCreds(initial_run bool, config_struct config.ConfigSt
 			//ansible logic to copy the secret and config
 			hostFileName := "broadcast_hosts"
 			utils.HostsWithCurrentNodes(hostFileName, config_struct.ClusterDetails)
-			err := ansibleutils.UpdateWithTags(hostFileName, config_struct.ClusterDetails, []string{"update_secret", "update_config"})
+			err := ansibleutils.UpdateWithTags(config_struct.ClusterDetails.SshUser, hostFileName, []string{"update_secret", "update_config"})
 			if err != nil {
 				log.Error.Println(err)
 				log.Error.Println("Unable to update config.yaml and .secret.txt on the other node")
@@ -221,7 +222,7 @@ func UpdateSecretAndEncryptCreds(initial_run bool, config_struct config.ConfigSt
 		//ansible logic to copy the secret and config
 		hostFileName := "broadcast_hosts"
 		utils.HostsWithCurrentNodes(hostFileName, config_struct.ClusterDetails)
-		err := ansibleutils.UpdateWithTags(hostFileName, config_struct.ClusterDetails, []string{"update_secret", "update_config"})
+		err := ansibleutils.UpdateWithTags(config_struct.ClusterDetails.SshUser, hostFileName, []string{"update_secret", "update_config"})
 		if err != nil {
 			log.Error.Println(err)
 			log.Error.Println("Unable to update config.yaml and .secret.txt on the other node")
@@ -234,14 +235,14 @@ func UpdateSecretAndEncryptCreds(initial_run bool, config_struct config.ConfigSt
 }
 
 func OsCredsMismatch(currOsCred config.OsCredentials, prevOsCred config.OsCredentials) bool {
-	if (currOsCred.OsAdminUsername != prevOsCred.OsAdminUsername) || (currOsCred.OsAdminPassword != prevOsCred.OsAdminPassword) {
+	if (currOsCred.OsAdminUsername != prevOsCred.OsAdminUsername) || (currOsCred.OsAdminPassword != currOsCred.OsAdminPassword) {
 		return true
 	}
 	return false
 }
 
 func CloudCredsMismatch(currCloudCred config.CloudCredentials, prevCloudCred config.CloudCredentials) bool {
-	if (currCloudCred.SecretKey != prevCloudCred.SecretKey) || (currCloudCred.AccessKey != prevCloudCred.AccessKey) || (currCloudCred.RoleArn != prevCloudCred.RoleArn) {
+	if (currCloudCred.SecretKey != prevCloudCred.SecretKey) || (currCloudCred.AccessKey != prevCloudCred.AccessKey) {
 		return true
 	}
 	return false

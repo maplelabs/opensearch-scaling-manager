@@ -15,6 +15,7 @@ import (
 	utils "github.com/maplelabs/opensearch-scaling-manager/utilities"
 
 	"github.com/fsnotify/fsnotify"
+	cron "github.com/robfig/cron/v3"
 	"github.com/tkuchiki/faketime"
 )
 
@@ -27,10 +28,17 @@ var log logger.LOG
 // A global variable which lets the provision continue from where it left off if there was an abrupt stop and restart of application.
 var firstExecution bool
 
+// A global variable to keep track of cronJob details
+var cronJob = cron.New()
+
 var seed = time.Now().Unix()
 
+func init() {
+	log.Init("logger")
+	log.Info.Println("Main module initialized")
+}
+
 // Input:
-//
 // Description:
 //
 //	Initializes the main module
@@ -40,23 +48,15 @@ var seed = time.Now().Unix()
 //
 // Return:
 func Initialize() {
-	log.Init("logger")
-	log.Info.Println("Main module initialized")
 
 	firstExecution = true
 
-	configStruct, err := config.GetConfig()
+	_, err := config.GetConfig()
 	if err != nil {
 		log.Panic.Println("The recommendation can not be made as there is an error in the validation of config file.", err)
 		panic(err)
 	}
 	provision.InitializeDocId()
-
-	userCfg := configStruct.UserConfig
-
-	if !userCfg.MonitorWithSimulator {
-		go fetch.FetchMetrics(userCfg.FetchPollingInterval, userCfg.PurgeAfter)
-	}
 
 }
 
@@ -81,12 +81,10 @@ func Run() {
 		panic(err)
 	}
 
-	go fileWatch(configStruct)
-
 	// A periodic check if there is a change in master node to pick up incomplete provisioning
-	go periodicProvisionCheck(configStruct.UserConfig.RecommendationPollingInterval, t)
-	ticker := time.NewTicker(time.Duration(configStruct.UserConfig.RecommendationPollingInterval) * time.Second)
-	for ; true; <-ticker.C {
+	go periodicProvisionCheck(configStruct.UserConfig.PollingInterval, t)
+	ticker := time.Tick(time.Duration(configStruct.UserConfig.PollingInterval) * time.Second)
+	for range ticker {
 		var isMaster bool
 		if configStruct.UserConfig.MonitorWithSimulator {
 			isMaster = true
@@ -104,7 +102,7 @@ func Run() {
 			//              if firstExecution || state.CurrentState == "normal" {
 			firstExecution = false
 			// This function will be responsible for parsing the config file and fill in task_details struct.
-			var task config.TaskDetails
+			var task = new(recommendation.TaskDetails)
 			configStruct, err := config.GetConfig()
 			if err != nil {
 				log.Error.Println("The recommendation can not be made as there is an error in the validation of config file.")
@@ -114,12 +112,11 @@ func Run() {
 			task.Tasks = configStruct.TaskDetails
 			userCfg := configStruct.UserConfig
 			clusterCfg := configStruct.ClusterDetails
-			metricTasks, eventTasks := recommendation.ParseTasks(task)
-			if len(eventTasks.Tasks) > 0 {
-				recommendation.CreateCronJob(eventTasks, clusterCfg, userCfg, t)
+			recommendationList, cronJobList := task.EvaluateTask(userCfg.PollingInterval, userCfg.MonitorWithSimulator, userCfg.IsAccelerated)
+			if len(cronJobList) > 0 {
+				CreateCronJob(cronJobList, state, clusterCfg, userCfg, t)
 			}
-			recommendationList := recommendation.EvaluateTask(userCfg.RecommendationPollingInterval, userCfg.MonitorWithSimulator, userCfg.IsAccelerated, metricTasks)
-			provision.GetRecommendation(recommendationList, clusterCfg, userCfg, t)
+			provision.GetRecommendation(state, recommendationList, clusterCfg, userCfg, t)
 			if configStruct.UserConfig.MonitorWithSimulator && configStruct.UserConfig.IsAccelerated {
 				*t = t.Add(time.Minute * 5)
 			}
@@ -137,9 +134,9 @@ func Run() {
 //
 // Output:
 func periodicProvisionCheck(pollingInterval int, t *time.Time) {
+	tick := time.Tick(time.Duration(pollingInterval) * time.Second)
 	previousMaster := utils.CheckIfMaster(context.Background(), "")
-	ticker := time.NewTicker(time.Duration(pollingInterval) * time.Second)
-	for ; true; <-ticker.C {
+	for range tick {
 		state.GetCurrentState()
 		currentMaster := utils.CheckIfMaster(context.Background(), "")
 		if state.CurrentState != "normal" && currentMaster {
@@ -153,26 +150,26 @@ func periodicProvisionCheck(pollingInterval int, t *time.Time) {
 				}
 				if strings.Contains(state.CurrentState, "scaleup") {
 					log.Debug.Println("Calling scaleOut")
-					isScaledUp, err := provision.ScaleOut(configStruct.ClusterDetails, configStruct.UserConfig, t)
+					isScaledUp, err := provision.ScaleOut(configStruct.ClusterDetails, configStruct.UserConfig, state, t)
 					if isScaledUp {
 						log.Info.Println("Scaleup completed successfully")
-						provision.PushToOs("Success", err)
+						provision.PushToOs(state, "Success", err)
 					} else {
 						log.Warn.Println("Scaleup failed", err)
-						provision.PushToOs("Failed", err)
+						provision.PushToOs(state, "Failed", err)
 					}
-					provision.SetStateBackToNormal()
+					provision.SetBackToNormal(state)
 				} else if strings.Contains(state.CurrentState, "scaledown") {
 					log.Debug.Println("Calling scaleIn")
-					isScaledDown, err := provision.ScaleIn(configStruct.ClusterDetails, configStruct.UserConfig, t)
+					isScaledDown, err := provision.ScaleIn(configStruct.ClusterDetails, configStruct.UserConfig, state, t)
 					if isScaledDown {
 						log.Info.Println("Scaledown completed successfully")
-						provision.PushToOs("Success", err)
+						provision.PushToOs(state, "Success", err)
 					} else {
 						log.Warn.Println("Scaledown failed", err)
-						provision.PushToOs("Failed", err)
+						provision.PushToOs(state, "Failed", err)
 					}
-					provision.SetStateBackToNormal()
+					provision.SetBackToNormal(state)
 				}
 				if configStruct.UserConfig.MonitorWithSimulator && configStruct.UserConfig.IsAccelerated {
 					*t = t.Add(time.Minute * 5)
@@ -186,7 +183,7 @@ func periodicProvisionCheck(pollingInterval int, t *time.Time) {
 
 // This function monitors the config.yaml residing directory for any writes continuously and on
 // noticing a write event, updates the encrypted creds in the config file.
-func fileWatch(previousConfigStruct config.ConfigStruct) {
+func FileWatch(previousConfigStruct config.ConfigStruct, moduleName string) {
 	//Adding file watcher to detect the change in configuration
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -202,7 +199,7 @@ func fileWatch(previousConfigStruct config.ConfigStruct) {
 			// watch for events
 			case event := <-watcher.Events:
 				if strings.Contains(event.Name, config.ConfigFileName) {
-					if utils.CheckIfMaster(context.Background(), "") {
+					if utils.CheckIfMaster(context.Background(), "") && moduleName == "crypto" {
 						currentConfigStruct, err := config.GetConfig()
 						if err != nil {
 							log.Panic.Println("Error while reading config file : ", err)
@@ -240,6 +237,51 @@ func fileWatch(previousConfigStruct config.ConfigStruct) {
 		log.Error.Println("Error while adding the config file changes to the fileWatcher :", err)
 	}
 	<-done
+}
+
+func StartFetchMetrics() {
+	configStruct, err := config.GetConfig()
+	if err != nil {
+		log.Error.Println("Error validating config file", err)
+		panic(err)
+	}
+	userCfg := configStruct.UserConfig
+
+	if !userCfg.MonitorWithSimulator {
+		fetch.FetchMetrics(userCfg.PollingInterval, userCfg.PurgeAfter)
+	} else {
+		log.Warn.Println("MonitorWithSimulator is enabled. Please disable and re-run the fetch-metrics module.")
+		os.Exit(1)
+	}
+}
+
+// Input:
+//
+//	cronTasks ([]]recommendation.Task): List of tasks to be added to Cron Job
+//	state (*provision.State): A pointer to the state struct which is state maintained in OS document
+//	clusterCfg (config.ClusterDetails): Cluster Level config details
+//	usrCfg (config.UserConfig): User defined config for application behavior
+//
+// Description:
+//
+//		At each polling interval creates the cron jobs based on the config file. It removes the Cron Jobs that were
+//	 added in previous polling interval and creates required jobs. It will use the list of tasks (cronTasks) to
+//		schedule and create cron job.
+//
+// Return:
+func CreateCronJob(cronTasks []recommendation.Task, state *provision.State, clusterCfg config.ClusterDetails, userCfg config.UserConfig, t *time.Time) {
+	for _, jobs := range cronJob.Entries() {
+		cronJob.Remove(jobs.ID)
+	}
+
+	for _, cronTask := range cronTasks {
+		for _, rules := range cronTask.Rules {
+			cronJob.AddFunc(rules.SchedulingTime, func() {
+				provision.TriggerCron(rules.NumNodesRequired, cronTask.TaskName, state, clusterCfg, userCfg, rules.SchedulingTime, t)
+			})
+		}
+	}
+	cronJob.Start()
 }
 
 // Input:
