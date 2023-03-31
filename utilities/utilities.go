@@ -4,11 +4,12 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"github.com/maplelabs/opensearch-scaling-manager/logger"
-	"github.com/maplelabs/opensearch-scaling-manager/config"
-	osutils "github.com/maplelabs/opensearch-scaling-manager/opensearchUtils"
 	"hash/fnv"
 	"os"
+
+	"github.com/maplelabs/opensearch-scaling-manager/config"
+	"github.com/maplelabs/opensearch-scaling-manager/logger"
+	osutils "github.com/maplelabs/opensearch-scaling-manager/opensearchUtils"
 )
 
 // A global logger variable used across the package for logging.

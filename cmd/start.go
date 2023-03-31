@@ -2,10 +2,12 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/spf13/cobra"
 	"os"
 	"os/exec"
 
+	"github.com/spf13/cobra"
+
+	"github.com/maplelabs/opensearch-scaling-manager/config"
 	"github.com/maplelabs/opensearch-scaling-manager/logger"
 	app "github.com/maplelabs/opensearch-scaling-manager/scaleManager"
 )
@@ -43,7 +45,8 @@ var startCmd = &cobra.Command{
 // Input:
 //
 // Description:
-// 	Initializes the start command, adds the required flags
+//
+//	Initializes the start command, adds the required flags
 //
 // Return:
 func init() {
@@ -55,14 +58,20 @@ func init() {
 //
 // Description:
 //
-// 	The Function initilazes and starts the execution of Scaling Manager
+//	The Function initilazes and starts the execution of Scaling Manager
 //
 // Return:
 //
-// 	(error): Returns error upon unsuccessful execution
+//	(error): Returns error upon unsuccessful execution
 func start() error {
 	app.Initialize()
 	app.Run()
+	configStruct, err := config.GetConfig()
+	if err != nil {
+		log.Panic.Println("The recommendation can not be made as there is an error in the validation of config file.", err)
+		panic(err)
+	}
+	app.FileWatch(configStruct, "scalingManager")
 	return nil
 }
 
@@ -70,13 +79,13 @@ func start() error {
 //
 // Description:
 //
-// 	The Function is executed when user sets flag(--b=true) along
-// 	with start command. It creates a Background process and creates
-// 	a file to track the Process Id of the background process.
+//	The Function is executed when user sets flag(--b=true) along
+//	with start command. It creates a Background process and creates
+//	a file to track the Process Id of the background process.
 //
 // Return:
 //
-// 	(error): Returns error upon unsuccessful execution.
+//	(error): Returns error upon unsuccessful execution.
 func startBackground() error {
 	_, err := os.Stat(PidFilePath + "/pidFile")
 

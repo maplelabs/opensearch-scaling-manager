@@ -4,16 +4,12 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/maplelabs/opensearch-scaling-manager/config"
 )
 
 // Input:
-//	launchTemplateId (string): Launch Template ID using which a new ec2 instance will be spinned up
-//	launchTemplateVersion (string): Template version of the launch template specified
-//	cred (config.CloudCredentials): Cloud credentials to connect to AWS
 //
 // Description:
 //
@@ -22,16 +18,15 @@ import (
 //
 // Return:
 //
-//	(string, string, error): Returns the private ip address, instance ID of the spinned node and error if any
-func SpinNewVm(launchTemplateId string, launchTemplateVersion string, cred config.CloudCredentials) (string, string, error) {
-	sess := session.Must(session.NewSession())
-	var creds *credentials.Credentials
-	if cred.RoleArn != "" {
-		creds = stscreds.NewCredentials(sess, cred.RoleArn)
-	} else {
-		creds = credentials.NewStaticCredentials(cred.AccessKey, cred.SecretKey, "")
-	}
-	svc := ec2.New(sess, &aws.Config{Region: aws.String(cred.Region), Credentials: creds})
+//	(string, error): Returns the private ip address of the spinned node and error if any
+func SpinNewVm(launchTemplateId string, launchTemplateVersion string, cred config.CloudCredentials) (string, error) {
+	sess, err := session.NewSession(&aws.Config{
+		Region:      aws.String(cred.Region),
+		Credentials: credentials.NewStaticCredentials(cred.AccessKey, cred.SecretKey, ""),
+	})
+
+	// Create EC2 service client
+	svc := ec2.New(sess)
 
 	launchTemplate := &ec2.LaunchTemplateSpecification{
 		LaunchTemplateId: &launchTemplateId,
@@ -50,59 +45,55 @@ func SpinNewVm(launchTemplateId string, launchTemplateVersion string, cred confi
 
 	if err != nil {
 		log.Info.Println("Could not create instance", err)
-		return "", "", err
+		return "", err
 	}
 
 	log.Info.Println("Created instance, Instance ID: ", *runResult.Instances[0].InstanceId)
-	instance_id := *runResult.Instances[0].InstanceId
 	private_ip := *runResult.Instances[0].PrivateIpAddress
 	log.Info.Println("Created instance, Private IP: ", *runResult.Instances[0].PrivateIpAddress)
 
-	return private_ip, instance_id, nil
-
-}
-
-// Input:
-//
-//	instanceId (string): Instance ID of the ec2 instance to wait until it's status to be Okay
-// 	cred (config.CloudCredentials): Cloud credentials required to connect to AWS account
-//
-// Description:
-//
-//	Uses the instance ID provided to wait until the instance status to be Okay before proceeding with using the instance
-//
-// Return:
-//
-//	(error): Returns error if any while checking for the status
-func InstanceStatusCheck(instanceId string, cred config.CloudCredentials) error {
-	sess := session.Must(session.NewSession())
-	var creds *credentials.Credentials
-	if cred.RoleArn != "" {
-		creds = stscreds.NewCredentials(sess, cred.RoleArn)
-	} else {
-		creds = credentials.NewStaticCredentials(cred.AccessKey, cred.SecretKey, "")
+	// Add tags to the created instance
+	_, errtag := svc.CreateTags(&ec2.CreateTagsInput{
+		Resources: []*string{runResult.Instances[0].InstanceId},
+		Tags: []*ec2.Tag{
+			{
+				Key:   aws.String("User"),
+				Value: aws.String("meghana.r"),
+			},
+			{
+				Key:   aws.String("Production"),
+				Value: aws.String("Yes"),
+			},
+			{
+				Key:   aws.String("Project"),
+				Value: aws.String("Dev"),
+			},
+		},
+	})
+	if errtag != nil {
+		log.Error.Println("Could not create tags for instance", runResult.Instances[0].InstanceId, errtag)
+		return "", errtag
 	}
-	svc := ec2.New(sess, &aws.Config{Region: aws.String(cred.Region), Credentials: creds})
+	log.Info.Println("Tagged the instance")
 
 	allInstances := true
 
 	log.Info.Println("Waiting until instanceStatus to be Ok.......")
-	err := svc.WaitUntilInstanceStatusOk(&ec2.DescribeInstanceStatusInput{
-		InstanceIds:         []*string{&instanceId},
+	errRunning := svc.WaitUntilInstanceStatusOk(&ec2.DescribeInstanceStatusInput{
+		InstanceIds:         []*string{runResult.Instances[0].InstanceId},
 		IncludeAllInstances: &allInstances,
 	})
-	if err != nil {
-		log.Error.Println("Instance state is not okay even after maximum wait window")
-		return err
+	if errRunning != nil {
+		log.Error.Println("Instance state is nt okay even after maximum wait window")
+		return "", errRunning
 	}
-	return nil
+	return private_ip, nil
 
 }
 
 // Input:
 //
 //	privateIp (string): private ip address of the instance that needs to be terminated
-//      cred (config.CloudCredentials): Cloud credentials required to connect to AWS account
 //
 // Description:
 //
@@ -113,16 +104,13 @@ func InstanceStatusCheck(instanceId string, cred config.CloudCredentials) error 
 //
 //	(error): Returns error if any while terminating the instance
 func TerminateInstance(privateIp string, cred config.CloudCredentials) error {
-	sess := session.Must(session.NewSession())
-	var creds *credentials.Credentials
+	sess, err := session.NewSession(&aws.Config{
+		Region:      aws.String(cred.Region),
+		Credentials: credentials.NewStaticCredentials(cred.AccessKey, cred.SecretKey, ""),
+	})
 
-	if cred.RoleArn != "" {
-		creds = stscreds.NewCredentials(sess, cred.RoleArn)
-	} else {
-		creds = credentials.NewStaticCredentials(cred.AccessKey, cred.SecretKey, "")
-	}
-
-	svc := ec2.New(sess, &aws.Config{Region: aws.String(cred.Region), Credentials: creds})
+	// Create EC2 service client
+	svc := ec2.New(sess)
 
 	describeInput := &ec2.DescribeInstancesInput{
 		Filters: []*ec2.Filter{
@@ -139,7 +127,7 @@ func TerminateInstance(privateIp string, cred config.CloudCredentials) error {
 
 	if descErr != nil {
 		log.Info.Println("Could not get the description of instance", descErr)
-		return descErr
+		return err
 	}
 
 	instanceId := *describeResult.Reservations[0].Instances[0].InstanceId

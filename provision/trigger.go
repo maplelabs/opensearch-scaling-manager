@@ -17,6 +17,7 @@ import (
 
 // Input:
 //
+//	state (*State): A pointer to the state struct which is state maintained in OS document
 //	recommendationQueue ([]map[string]string): Recommendations provided by the recommendation engine in the form of an array of strings
 //	clusterCfg (config.ClusterDetails): Cluster Level config details
 //	usrCfg (config.UserConfig): User defined config for applicatio behavior
@@ -28,7 +29,7 @@ import (
 //	Triggers the provisioning
 //
 // Return:
-func GetRecommendation(recommendationQueue []map[string]string, clusterCfg config.ClusterDetails, usrCfg config.UserConfig, t *time.Time) {
+func GetRecommendation(state *State, recommendationQueue []map[string]string, clusterCfg config.ClusterDetails, usrCfg config.UserConfig, t *time.Time) {
 	var clusterCurrent cluster.ClusterDynamic
 	scaleRegexString := `(scale_up|scale_down)_by_([0-9]+)`
 	scaleRegex := regexp.MustCompile(scaleRegexString)
@@ -36,7 +37,7 @@ func GetRecommendation(recommendationQueue []map[string]string, clusterCfg confi
 		if usrCfg.MonitorWithSimulator {
 			clusterCurrent = cluster_sim.GetClusterCurrent(usrCfg.IsAccelerated)
 		} else {
-			clusterCurrent, _ = cluster.GetClusterCurrent(false)
+			clusterCurrent = cluster.GetClusterCurrent()
 		}
 
 		state.GetCurrentState()
@@ -66,7 +67,7 @@ func GetRecommendation(recommendationQueue []map[string]string, clusterCfg confi
 				return
 			}
 
-			TriggerProvision(clusterCfg, usrCfg, numNodes, t, operation, ruleResponsible)
+			TriggerProvision(clusterCfg, usrCfg, state, numNodes, t, operation, ruleResponsible)
 		} else {
 			log.Warn.Println("Recommendation can not be provisioned as open search cluster is already in provisioning phase.")
 		}
@@ -136,7 +137,7 @@ func checkNumNodesCondition(operation string, clusterCfg config.ClusterDetails, 
 		}
 	case "scale_down":
 		if numNodes-1 < clusterCfg.MinNodesAllowed {
-			log.Warn.Println("Cannot scale down as the minimum number of nodes for this cluster specified is reached.\n If you need the scale down to take place anyway, consider decreasing the min nodes in config.yaml")
+			log.Warn.Println("Cannot scale down as the minimum number of nodes for this cluster specified is reached.\n If you need the scale down to take place anyway, consider increasing the min nodes in config.yaml")
 			return false
 		}
 	}
@@ -227,29 +228,29 @@ func comparePreviousProvision(ruleResponsible string, operation string) bool {
 }
 
 // Input:
-//
-//	nodesRequired (int): Specifies required count of nodes to be present for the Event based scaling.
-//	task (string): Specifies the name of the task. i.e scale_up_by_1 or scale_down_by_1.
-//	state (*State): A pointer to the state struct which is state maintained in OS document.
+// 
+// 	nodesRequired (int): Specifies required count of nodes to be present for the Event based scaling.
+// 	task (string): Specifies the name of the task. i.e scale_up_by_1 or scale_down_by_1.
+// 	state (*State): A pointer to the state struct which is state maintained in OS document.
 //	clusterCfg (config.ClusterDetails): Cluster Level config details.
 //	usrCfg (config.UserConfig): User defined config for application behavior.
 //	rulesResponsible (string): Specifies the rule (cron time expression) that triggered the execution of cron job,
-//
+// 
 // Description:
-//
-//	Checks the current state to check if provision is in progress.
-//	if provision is not in progress
-//		Then triggers the Provision
-//	if provision is in progress
-//		logs the event and returns
-//
+// 
+// 	Checks the current state to check if provision is in progress. 
+// 	if provision is not in progress 
+// 		Then triggers the Provision
+// 	if provision is in progress
+// 		logs the event and returns
+// 
 // Return:
-func TriggerCron(t *time.Time, clusterCfg config.ClusterDetails, userCfg config.UserConfig, ruleResponsible, task string) {
+func TriggerCron(nodesRequired int, task string, state *State, clusterCfg config.ClusterDetails, usrCfg config.UserConfig, ruleResponsible string, t *time.Time) {
 
 	state.GetCurrentState()
-	if state.CurrentState != "normal" {
+	if state.CurrentState != "normal"{
 		log.Warn.Println("Provision is already in progress, Event based scaling will be discarded")
-		return
+		return 
 	}
 
 	scaleRegexString := `(scale_up|scale_down)_by_([0-9]+)`
@@ -261,10 +262,5 @@ func TriggerCron(t *time.Time, clusterCfg config.ClusterDetails, userCfg config.
 	numNodes, _ := strconv.Atoi(subMatch[2])
 	operation := subMatch[1]
 
-	numNodesProceed := checkNumNodesCondition(operation, clusterCfg, userCfg)
-
-	if numNodesProceed {
-		log.Info.Println("The ", task, " is triggered as event based scaling and will be provisioned.")
-		TriggerProvision(clusterCfg, userCfg, numNodes, t, operation, ruleResponsible)
-	}
+	TriggerProvision(clusterCfg, usrCfg, state, numNodes, t, operation, ruleResponsible)
 }
