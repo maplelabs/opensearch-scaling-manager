@@ -245,7 +245,14 @@ func ScaleOut(clusterCfg config.ClusterDetails, usrCfg config.UserConfig, t *tim
 			dataWriter.WriteString("[new_node]\n")
 			dataWriter.WriteString("node-" + strings.ReplaceAll(newNodeIp, ".", "-") + " ansible_user=" + username + " roles=master,data,ingest ansible_private_host=" + newNodeIp + " ansible_ssh_private_key_file=" + clusterCfg.CloudCredentials.PemFilePath + "\n")
 			dataWriter.Flush()
-			ansibleErr := ansibleutils.CallAnsible(username, hostsFileName, clusterCfg, "scale_up")
+			var ansibleErr error
+			for i := 0; i < 3; i++ {
+				ansibleErr = ansibleutils.CallAnsible(username, hostsFileName, clusterCfg, "scale_up")
+				if ansibleErr == nil {
+					break
+				}
+				log.Error.Println("Retrying ansible scripts on failure...")
+			}
 			if ansibleErr != nil {
 				if newNodeIp != "" {
 					log.Warn.Println("Terminating the instance as the ansible script failed.")
@@ -421,7 +428,14 @@ func ScaleIn(clusterCfg config.ClusterDetails, usrCfg config.UserConfig, t *time
 			dataWriter.WriteString(removeNodeName + " ansible_user=" + username + " roles=master,data,ingest ansible_private_host=" + removeNodeIp + " ansible_ssh_private_key_file=" + clusterCfg.CloudCredentials.PemFilePath + "\n")
 			dataWriter.Flush()
 			log.Info.Println("Removing node ***********************************:", removeNodeName)
-			ansibleErr := ansibleutils.CallAnsible(username, hostsFileName, clusterCfg, "scale_down")
+			var ansibleErr error
+			for i := 0; i < 3; i++ {
+				ansibleErr = ansibleutils.CallAnsible(username, hostsFileName, clusterCfg, "scale_down")
+				if ansibleErr == nil {
+					break
+				}
+				log.Error.Println("Retrying ansible scripts on failure...")
+			}
 			if ansibleErr != nil {
 				return false, ansibleErr
 			}
